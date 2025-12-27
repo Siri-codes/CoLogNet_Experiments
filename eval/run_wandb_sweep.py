@@ -33,7 +33,7 @@ def get_or_create_sweep_id():
     }
 
     # If not found, create a new sweep
-    sweep_id = wandb.sweep(sweep_config, project="CoLogNet_Experiments")
+    sweep_id = wandb.sweep(sweep_config, project="CoLogNet Experiments")
     
     with open(sweep_file, 'w') as f: # save sweep_id for future runs
         f.write(sweep_id)
