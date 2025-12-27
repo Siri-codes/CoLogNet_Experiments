@@ -1,14 +1,12 @@
 
-
+# Deep learning framework
 torch>=2.6.0
 torchvision>=0.21.0
-numpy>=2.1.0
 
-
+# Data processing / evaluation
+matplotlib>=3.10.0
 pandas>=2.2.0
 scikit-learn>=1.6.0
-# 
-wandb>=0.18.0
-tqdm>=4.67.0
 
-matplotlib>=3.10.0
+# Experiment tracking
+wandb>=0.18.0
