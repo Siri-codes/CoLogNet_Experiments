@@ -98,12 +98,14 @@ def train_test_wandb():
         dataset = Dataset_Enum[config.dataset]
         train_loader, val_loader, test_loader, y_scaler = process_data(dataset, batch_size=config.batch_size, data_dir='./data')
 
-        if config.config_type == "Uniform":
+        # 3 different depth configurations: Uniform, Even_Odd, Pyramid
+        #ex: if bbase_depth = 2 and num_ladders = 4
+        if config.config_type == "Uniform": # [2, 2, 2, 2]
             depths = [config.base_depth] * config.num_ladders
-        elif config.config_type == "Even_Odd":
+        elif config.config_type == "Even_Odd": # [2, 3, 2, 3]
             depths = [config.base_depth if i % 2 == 0 else config.base_depth + 1 
                       for i in range(config.num_ladders)]
-        elif config.config_type == "Pyramid":
+        elif config.config_type == "Pyramid": # [2, 4, 6, 8]
             depths = [config.base_depth + (i * 2) for i in range(config.num_ladders)]
 
         result_metric, total_params = train_test_loop(dataset, model_type, depths, config.lr, config.dropout, config.batch_size, config.num_epochs, weight_decay=1e-4)
