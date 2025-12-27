@@ -48,20 +48,16 @@ class ContNet_Model(nn.Module):
     - Continued logarithms, continuant form
     - Outputs binarized before recurrence formula
 
-    All variants follow Ensemble-Ladder Structure: 
-        each Output dimension has one Ensemble
-        each Ensemble is made up of *num_ladders* ladders
-        each Ladder has *depth* rungs or values
+    All variants follow Ladder Structure:
+        Given a list of depths [d_1, d_2, d_3, ..., d_n], creates n ladders
 
-        1) Linear Layer performed on ladder values
-        2) Ladder values passed into Recurrence Formula
-        3) Outputs for each ladder averaged to get one output per Ensemble
+        For each ladder,
+        1) matrix multiply inputs by weights w_i to get coefficients
+        2) apply recurrence formula using coefficients --> single value
+
+        To combine ladder results, perform matrix multiply with final_combiner to get vector of output_size
     '''
-    @classmethod
-    def __init__(cls, model_type, input_size, output_size, depth, num_ladders, dropout):
-        depth_list = np.full(depth, num_ladders)
-        return cls(model_type, input_size, output_size, depth_list, dropout)
-
+    
     def __init__(self, model_type, input_size, output_size, depth_list, dropout):
         '''
         Docstring for __init__
@@ -80,39 +76,26 @@ class ContNet_Model(nn.Module):
         self.depth_list = depth_list
         self.layers = nn.ModuleList()
 
-        for i in range(0, output_size): #create an ensemble for each output dim
-            ensemble = Ensemble(model_type, input_size, output_size, depth_list, dropout)
-            self.layers.append(ensemble)
+        self.final_layer = nn.Linear(in_features=len(depth_list), out_features=output_size, bias=True)
+
+        for d_i in depth_list:
+          l_i = Ladder(model_type, input_size, output_size, d_i, dropout)
+          self.layers.append(l_i)
 
     def forward(self, inputs):
         '''
         Docstring for forward
 
-        :param inputs: 2D input vector
+        :param inputs: 2D input vector [input_size, batch_size]
         '''
-        final_vector = [ensemble(inputs) for ensemble in self.layers]
-        final_vector = torch.stack(final_vector, dim=1)  # combine efficiently  
-        
-        return final_vector  # shape: (batch_size, output_size)
+        # Get outputs from each ladder
+        output = torch.stack([ladder(inputs) for ladder in self.layers], dim=1)
 
-class Ensemble(nn.Module):
-    def __init__(self, model_type, input_size, output_size, depth_list, dropout):
+        # Apply final linear layer
+        output = self.final_combiner(output)
 
-        super().__init__()
-        self.input_size = input_size
-        self.output_size = output_size
-        self.depth_list = depth_list
-        self.ladders = nn.ModuleList()
-        for depth in depth_list: #for each ladder in ensemble
-            ladder = Ladder(model_type, input_size, depth, dropout)
-            self.ladders.append(ladder) #add new ladder to ladders
-
-    def forward(self, inputs):
-        final_vector = [ladder(inputs) for ladder in self.ladders]
-        output = torch.stack(final_vector)
-        output = output.mean(dim=0)
-       
-        return output
+        # Depending on whether this is a regression task, may need different formatting:
+        return output.view(-1) if self.output_size == 1 else output
     
 class Ladder(nn.Module):
     def __init__(self, model_type, input_size, depth, dropout):
@@ -120,30 +103,35 @@ class Ladder(nn.Module):
         self.model_type = model_type
         self.input_size = input_size
         self.depth = depth
-        self.dropout = nn.Dropout(p=dropout) # optional dropout
 
-        self.weight = nn.Parameter(torch.Tensor(depth, input_size)) #depth rows & input_size columns
-        self.reset_parameters()
+        self.weight = nn.Linear(input_size, depth) #linear layer to get coefficients
+        self.norm = nn.LayerNorm(depth) #normalization layer
+        self.dropout = nn.Dropout(p=dropout) # optional dropout layer
         
-    def reset_parameters(self):
-        nn.init.xavier_uniform_(self.weight) 
-
     def forward(self, inputs):
-        linear_output = F.linear(inputs, self.weight) #linear layer, output: [batch_size, depth]
-        transposed_output = torch.transpose(linear_output, 0, 1) #flips rows and columns, output: [depth, batch_size]
+        # Coefficients: [batch, depth]
+      coeffs = self.norm(self.weight(inputs))
 
-        if self.model_type is Variant.COLOGNET_B: #if model is binarized, use STE
-            output = binarize_with_ste(transposed_output)
-        else:
-            output = torch.sigmoid(transposed_output)
+      # Binarize if CoLogB
+      if self.model_type is Variant.COLOGNET_B:
+        coeffs = binarize_with_ste(coeffs)
 
-        recc_form_output = self.recurrence_formula(output, self.model_type) #apply recurrence formula
-        output = self.dropout(recc_form_output)
-        return output
+      # Transpose for recurrence: [depth, batch]
+      coeffs_t = coeffs.t()
+
+      # Recurrence --> [batch]
+      output = self.recurrence_formula(coeffs_t, self.model_type)
+
+      # Apply dropout
+      output = self.dropout(output.view(-1, 1)) # ensuring output is one column of length batch_size
+
+      # Return as [batch] for stacking
+      return output.view(-1)
     
     @staticmethod
     def recurrence_formula(X: torch.Tensor, model_type): 
-        #X: tensor of exponents for recurrence terms, model_type: Variant.COFRNET, Variant.COLOGNET, Variant.COLOGNETB
+        # X: tensor of exponents for recurrence terms, 
+        # model_type: Variant.COFRNET, Variant.COLOGNET, Variant.COLOGNETB
         '''
         Computes convergent x_n = A_n/B_n, where
         
@@ -165,11 +153,12 @@ class Ladder(nn.Module):
 
         '''
     
-        n = len(X)
+        n = X.shape[0]
 
         if model_type is Variant.COFRNET:
             C = X
         else:
+            X = torch.clamp(X, -10, 10) #clamp exponents between -10 and 10 for stability -- can change range if needed
             C = torch.pow(2, X) #raise 2^x for each value
 
         A_neg1 = 1.0
