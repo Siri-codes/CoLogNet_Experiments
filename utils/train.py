@@ -1,4 +1,8 @@
 #Train Function
+import torch
+import torch.nn as nn
+import torch.optim as optim
+
 def train(model, dataloader, val_loader, num_epochs, lr, weight_decay, is_regression):
 
     '''

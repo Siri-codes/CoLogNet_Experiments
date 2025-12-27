@@ -1,4 +1,4 @@
-#MLP Models as
+#MLP Models as Controls
 
 import math
 import torch.nn as nn 

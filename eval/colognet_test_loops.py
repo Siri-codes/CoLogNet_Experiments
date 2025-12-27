@@ -1,31 +1,16 @@
-import unittest
-import os
-import shutil
-import sys
-from xml.parsers.expat import model
+#TRAIN/TEST LOOPS
 
-from torch.utils.data import DataLoader
-from tqdm import tqdm
-import numpy as np
-from torch.utils.data import Dataset
 import torch # import main library
-import torch.nn as nn # import modules
-from torch.autograd import Function # import Function to create custom activations
-from torch.nn.parameter import Parameter # import Parameter to create custom activations with learnable parameters
-import torch.nn.functional as F # import torch functions
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.model_selection import train_test_split
-import torch.optim as optim
-from sklearn.datasets import load_breast_cancer, load_wine, load_linnerud, load_diabetes, load_iris, load_digits
-from sklearn.preprocessing import LabelEncoder
-from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import r2_score
 
-import random
-import pandas as pd
-import matplotlib.pyplot as plt
-
 import wandb
+
+from utils.data_processing import Dataset_Enum, process_data, plot_loss_curves
+from models.colognet import ContNet_Model, Variant
+from models.mlp import MLP
+from models.mlp import SwiGLUMLP
+from utils.train import train
+
 
 def train_test_loop(dataset, model_type, depths, learning_rate, dropout, batch_size, num_epochs, weight_decay=1e-4):
   '''

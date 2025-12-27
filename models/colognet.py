@@ -1,6 +1,6 @@
-import sys
-import pandas as pd #loading data in table form
-import numpy as np # linear algebra
+
+#COFRNET/COLOGNET MODEL DEFINITIONS
+
 import torch # import main library
 import torch.nn as nn # import modules
 from torch.autograd import Function # import Function to create custom activations
@@ -9,7 +9,7 @@ import torch.nn.functional as F # import torch functions
 
 from enum import Enum
 
-#Straight-Through Estimator
+#Straight-Through Estimator (for binarized CoLogNetB)
 class Binarize_STE(torch.autograd.Function): 
     '''
     A typical straight through estimator for BNNs (e.g. XNOR-Net)
@@ -27,13 +27,13 @@ class Binarize_STE(torch.autograd.Function):
 def binarize_with_ste(x):
     return Binarize_STE.apply(x)
 
-#Continued Fraction/Logarithm Model
-
+#Continued Fraction/Logarithm Model Variants
 class Variant(Enum):
     COFRNET = "cofr"
     COLOGNET = "colog"
     COLOGNET_B = "colog_b" 
 
+#Continued Fraction/Logarithm Neural Network Model
 class ContNet_Model(nn.Module):
     '''
     Variant 1: CoFrNet
