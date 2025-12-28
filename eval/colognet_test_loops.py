@@ -81,8 +81,7 @@ def train_test_wandb():
         model_type = Variant[config.model_type]
 
         dataset = Dataset_Enum[config.dataset]
-        train_loader, val_loader, test_loader, y_scaler = process_data(dataset, batch_size=config.batch_size, data_dir='./data')
-
+        
         # 3 different depth configurations: Uniform, Even_Odd, Pyramid
         #ex: if bbase_depth = 2 and num_ladders = 4
         if config.config_type == "Uniform": # [2, 2, 2, 2]
@@ -93,7 +92,7 @@ def train_test_wandb():
         elif config.config_type == "Pyramid": # [2, 4, 6, 8]
             depths = [config.base_depth + (i * 2) for i in range(config.num_ladders)]
 
-        result_metric, total_params = train_test_loop(dataset, model_type, depths, config.lr, config.dropout, config.batch_size, config.num_epochs, weight_decay=1e-4)
+        result_metric, total_params = train_test_loop(dataset, model_type, depths, config.lr, config.dropout, config.batch_size, epochs=30, weight_decay=1e-4)
            
         wandb.log({"score": result_metric, "total_params": total_params})
 
@@ -111,7 +110,6 @@ def eval_model(model, dataloader, is_regression=False, y_scaler=None):
   model.to(device)
   model.eval() # Set model to evaluation mode
 
-  total_loss = 0
   num_correct = 0
   num_total = 0
   all_preds = []
