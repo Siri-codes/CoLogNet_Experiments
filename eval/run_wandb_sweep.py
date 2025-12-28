@@ -23,12 +23,14 @@ def get_or_create_sweep_id():
         'method': 'grid',  # Grid search: iterates through all combinations
         'metric': {'name': 'accuracy', 'goal': 'maximize'}, # maximizing accuracy
         'parameters': {
-            'model_type': {'values': ['MLP', 'COLOGNET']},
+            'dataset': {'values': ['MNIST', 'WAVEFORM', 'BOSTON']},
+            'model_type': {'values': ['MLP', 'SWIGLU', 'COFRNET','COLOGNET', 'COLOGNET_B']},
             'lr': {'values': [0.0005, 0.001, 0.005, 0.01]},
-            'num_ladders': {'values': [2, 3, 4, 5, 6, 7]},
-            'base_depth': {'values': [3, 4, 5, 6]}, 
+            'num_ladders': {'values': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]},
+            'base_depth': {'values': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}, 
             'config_type': {'values': ['Uniform', 'Even_Odd', 'Pyramid']},
-            'batch_size': {'values': [32, 64, 128]}
+            'batch_size': {'values': [32, 64, 128]},
+            'dropout': {'values': [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]},
         }
     }
 
