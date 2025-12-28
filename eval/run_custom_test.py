@@ -2,7 +2,7 @@
 
 import __main__
 from utils.data_processing import Dataset_Enum
-from eval.colognet_test_loops import train_test_loop
+from colognet_test_loops import train_test_loop
 from models.colognet import Variant
 
 # Choose dataset, model_type, hyperparameters:
