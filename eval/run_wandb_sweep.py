@@ -2,7 +2,7 @@
 
 import wandb
 import os
-from colognet_test_loops import train_test_wandb
+from eval.colognet_test_loops import train_test_wandb
 
 sweep_file = "sweep_id.txt"
 
