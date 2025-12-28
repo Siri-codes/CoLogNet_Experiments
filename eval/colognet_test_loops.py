@@ -92,7 +92,7 @@ def train_test_wandb():
         elif config.config_type == "Pyramid": # [2, 4, 6, 8]
             depths = [config.base_depth + (i * 2) for i in range(config.num_ladders)]
 
-        result_metric, total_params = train_test_loop(dataset, model_type, depths, config.lr, config.dropout, config.batch_size, epochs=30, weight_decay=1e-4)
+        result_metric, total_params = train_test_loop(dataset, model_type, depths, config.lr, config.dropout, config.batch_size, epochs=50, weight_decay=1e-4)
            
         wandb.log({"score": result_metric, "total_params": total_params})
 
