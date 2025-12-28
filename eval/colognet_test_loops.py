@@ -28,7 +28,7 @@ def train_test_loop(dataset, model_type, depths, learning_rate, dropout, batch_s
   '''
 
   #get data loaders
-  train_loader, val_loader, test_loader, y_scaler = process_data(dataset, batch_size, data_dir="./data")
+  train_loader, val_loader, test_loader, y_scaler = process_data(dataset, data_dir="./data", batch_size=batch_size)
 
   if dataset is Dataset_Enum.MNIST:
     input_size = 784
@@ -48,7 +48,7 @@ def train_test_loop(dataset, model_type, depths, learning_rate, dropout, batch_s
   elif model_type is Variant.SWIGLU:
     model = SwiGLUMLP(input_size, output_size, depths, dropout)
   else:
-    model = ContNet_Model(model_type, input_size, output_size, depths, dropout, is_regression)
+    model = ContNet_Model(model_type, input_size, output_size, depths, dropout)
 
   #train the model
   history = train(model, train_loader, val_loader, num_epochs=num_epochs, lr=learning_rate, weight_decay=weight_decay, is_regression=is_regression)

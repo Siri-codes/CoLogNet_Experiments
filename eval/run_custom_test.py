@@ -1,8 +1,15 @@
 #CUSTOM TEST SCRIPT
 
+'''
+To run the following code via terminal 
+1) navigate to the root directory (CoLogNet_Experiments)
+2) run: python -m eval.run_custom_test
+'''
+
+
 import __main__
 from utils.data_processing import Dataset_Enum
-from colognet_test_loops import train_test_loop
+from eval.colognet_test_loops import train_test_loop
 from models.colognet import Variant
 
 # Choose dataset, model_type, hyperparameters:

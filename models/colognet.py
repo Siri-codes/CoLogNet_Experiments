@@ -32,6 +32,8 @@ class Variant(Enum):
     COFRNET = "cofr"
     COLOGNET = "colog"
     COLOGNET_B = "colog_b" 
+    MLP = "mlp"
+    SWIGLU = "swiglu"
 
 #Continued Fraction/Logarithm Neural Network Model
 class ContNet_Model(nn.Module):
