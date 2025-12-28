@@ -57,7 +57,7 @@ class ContNet_Model(nn.Module):
         1) matrix multiply inputs by weights w_i to get coefficients
         2) apply recurrence formula using coefficients --> single value
 
-        To combine ladder results, perform matrix multiply with final_combiner to get vector of output_size
+        To combine ladder results, perform matrix multiply with final_layer to get vector of output_size
     '''
     
     def __init__(self, model_type, input_size, output_size, depth_list, dropout):
@@ -94,7 +94,7 @@ class ContNet_Model(nn.Module):
         output = torch.stack([ladder(inputs) for ladder in self.layers], dim=1)
 
         # Apply final linear layer
-        output = self.final_combiner(output)
+        output = self.final_layer(output)
 
         # Depending on whether this is a regression task, may need different formatting:
         return output.view(-1) if self.output_size == 1 else output
@@ -160,7 +160,7 @@ class Ladder(nn.Module):
         if model_type is Variant.COFRNET:
             C = X
         else:
-            X = torch.clamp(X, -10, 10) #clamp exponents between -10 and 10 for stability -- can change range if needed
+            #(X, -10, 10) #clamp exponents between -10 and 10 for stability -- can change range if needed
             C = torch.pow(2, X) #raise 2^x for each value
 
         A_neg1 = 1.0
