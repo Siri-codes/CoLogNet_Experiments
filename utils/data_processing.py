@@ -36,6 +36,7 @@ def process_data(dataset, data_dir, batch_size):
     # DATA LOADING & PREPROCESSING
     if dataset == Dataset_Enum.MNIST: # MNIST
 
+        '''
         # Train transform (includes augmentation)
         # augmentation teaches model to recognize digits even if they are slightly tilted or shifted
         train_transform = v2.Compose([
@@ -70,6 +71,29 @@ def process_data(dataset, data_dir, batch_size):
         # Create datasets using shared indices and different (augmented/real) versions of data
         train_dataset = Subset(full_train_augmented, train_indices)
         val_dataset = Subset(full_train_clean, val_indices)
+        '''
+
+        # Simple version without augmentation for simplicity/speed
+        transform = v2.Compose([
+            v2.ToImage(),
+            v2.ToDtype(torch.float32, scale=True),
+            v2.Normalize((0.1307,), (0.3081,)),
+            v2.Lambda(lambda x: x.view(-1))
+        ])
+
+        full_train = datasets.MNIST(data_dir, train=True, download=True, transform=transform)
+        
+        # Create shared indices to split the training data (90/10 train-val split)
+        indices = torch.randperm(len(full_train)) #shuffle indices: random permutation of ints [0, n)
+        val_size = int(0.1 * len(full_train)) #10% used for validation set, 90% used for train set
+        train_indices = indices[val_size:] #last 90% used for training
+        val_indices = indices[:val_size] #first 10% used for validation
+
+        # Create datasets using shared indices and different (augmented/real) versions of data
+        train_dataset = Subset(full_train, train_indices)
+        val_dataset = Subset(full_train, val_indices)
+
+        test_dataset = datasets.MNIST(data_dir, train=False, download=True, transform=transform)
 
     else:
         # Tabular data (Boston Housing & Waveform)
@@ -114,9 +138,9 @@ def process_data(dataset, data_dir, batch_size):
         test_dataset = to_tensor_ds(X_test, y_test, is_regression)
 
     # DATALOADER CREATION
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=2, pin_memory=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=2, pin_memory=True)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=2, pin_memory=True)
 
     return train_loader, val_loader, test_loader, y_scaler
 
