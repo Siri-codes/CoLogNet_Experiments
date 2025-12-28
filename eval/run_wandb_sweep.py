@@ -43,7 +43,12 @@ def get_or_create_sweep_id():
     print(f"Created new sweep ID: {sweep_id}")
     return sweep_id
 
+def main():
+    '''
+    Run the W&B sweep
+    '''
+    sweep_id = get_or_create_sweep_id()
+    wandb.agent(sweep_id, function=train_test_wandb) #runs the hyperparameter sweep
 
-# Initialize and start
-sweep_id = get_or_create_sweep_id()
-wandb.agent(sweep_id, function=train_test_wandb) #runs the hyperparameter sweep
+if __name__ == "__main__":
+    main()
