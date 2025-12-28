@@ -1,4 +1,6 @@
 
+# Before running code, run pip install -r requirements.txt in the terminal
+
 # Deep learning framework
 torch>=2.6.0
 torchvision>=0.21.0

@@ -81,7 +81,7 @@ class ContNet_Model(nn.Module):
         self.final_layer = nn.Linear(in_features=len(depth_list), out_features=output_size, bias=True)
 
         for d_i in depth_list:
-          l_i = Ladder(model_type, input_size, output_size, d_i, dropout)
+          l_i = Ladder(model_type, input_size, d_i, dropout)
           self.layers.append(l_i)
 
     def forward(self, inputs):
