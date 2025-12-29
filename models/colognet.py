@@ -159,9 +159,11 @@ class Ladder(nn.Module):
 
         if model_type is Variant.COFRNET:
             C = X
+            epsilon = 0.1
         else:
             #(X, -10, 10) #clamp exponents between -10 and 10 for stability -- can change range if needed
             C = torch.pow(2, X) #raise 2^x for each value
+            epsilon = 0.0
 
         A_neg1 = 1.0
         B_neg1 = 0.0
@@ -189,5 +191,5 @@ class Ladder(nn.Module):
             B_n = C[i] * B_prev + dep_term * B_prev2 #next denominator term
             A_prev2, A_prev = A_prev, A_n #prepping new A_{n-2} and A{n-1} terms
             B_prev2, B_prev = B_prev, B_n #ditto
-        
-        return A_n / (B_n + 1e-10) #return convergent, add small constant to denominator to prevent division by zero
+
+        return A_n / (B_n + epsilon) #add small epsilon if cofrnet
