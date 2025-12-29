@@ -83,7 +83,7 @@ def train_test_wandb():
         dataset = Dataset_Enum[config.dataset]
         
         # 3 different depth configurations: Uniform, Even_Odd, Pyramid
-        #ex: if bbase_depth = 2 and num_ladders = 4
+        #ex: if base_depth = 2 and num_ladders = 4
         if config.config_type == "Uniform": # [2, 2, 2, 2]
             depths = [config.base_depth] * config.num_ladders
         elif config.config_type == "Even_Odd": # [2, 3, 2, 3]
