@@ -1,6 +1,15 @@
 # Junk!
 junk/
 
+#W&B
+wandb/
+
+#data
+data/
+
+/best_model.pth 
+/sweep_id.txt
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

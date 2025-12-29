@@ -8,9 +8,9 @@ To run the following code via terminal
 
 
 import __main__
-from utils.data_processing import Dataset_Enum
-from eval.colognet_test_loops import train_test_loop
-from models.colognet import Variant
+from CoLogNet_Experiments.utils.data_processing import Dataset_Enum
+from CoLogNet_Experiments.eval.colognet_test_loops import train_test_loop
+from CoLogNet_Experiments.models.colognet import Variant
 
 # Choose dataset, model_type, hyperparameters:
 dataset = Dataset_Enum.MNIST

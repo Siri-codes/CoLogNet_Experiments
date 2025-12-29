@@ -5,11 +5,11 @@ from sklearn.metrics import r2_score
 
 import wandb
 
-from utils.data_processing import Dataset_Enum, process_data, plot_loss_curves
-from models.colognet import ContNet_Model, Variant
-from models.mlp import MLP
-from models.mlp import SwiGLUMLP
-from utils.train import train
+from CoLogNet_Experiments.utils.data_processing import Dataset_Enum, process_data, plot_loss_curves
+from CoLogNet_Experiments.models.colognet import ContNet_Model, Variant
+from CoLogNet_Experiments.models.mlp import MLP
+from CoLogNet_Experiments.models.mlp import SwiGLUMLP
+from CoLogNet_Experiments.utils.train import train
 
 
 def train_test_loop(dataset, model_type, depths, learning_rate, dropout, batch_size, num_epochs, weight_decay=1e-4):
