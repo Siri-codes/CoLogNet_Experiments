@@ -190,4 +190,4 @@ class Ladder(nn.Module):
             A_prev2, A_prev = A_prev, A_n #prepping new A_{n-2} and A{n-1} terms
             B_prev2, B_prev = B_prev, B_n #ditto
         
-        return A_n / B_n
+        return A_n / (B_n + 1e-10) #return convergent, add small constant to denominator to prevent division by zero
