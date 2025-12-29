@@ -9,14 +9,14 @@ class MLP(nn.Module):
   MLP neural network as control
   '''
 
-  def __init__(self, input_size, output_size, depths, dropout=0.1, num_layers):
+  def __init__(self, input_size, output_size, depths, dropout=0.1, num_hidden):
       """
       Args:
           input_size (int): Input features.
           output_size (int): Output features.
           depths (list of int): List containing the depth for each ladder (e.g., [2, 3, 5, 8]).
           dropout (float): Dropout rate.
-          num_layers (int): Number of layers in the MLP.
+          num_hidden (int): Number of hidden layers in the MLP.
       """
       super().__init__()
       self.output_size = output_size
@@ -29,16 +29,16 @@ class MLP(nn.Module):
       # --> h = (target_params - output_size) / (input_size + 1 + output_size)
       denom = input_size + 1 + output_size
       total_hidden_size = math.ceil((target_params - output_size) / denom) #for fair play, round up to give MLP the advantage
-      hidden_size = total_hidden_size / num_layers #divide total hidden size by number of layers to get hidden size per layer
+      hidden_size = total_hidden_size / num_hidden #divide total hidden size by number of hidden layers to get hidden size per layer
 
       if hidden_size <= 0: #hidden_size must be at least 1
           hidden_size = 1
 
       print(f"Total ContNet Parameters: {target_params}") #print target params for comparison
-      print(f"Calculated MLP Hidden Size: {hidden_size}, Hidden layers: {num_layers}")
+      print(f"Calculated MLP Hidden Size: {hidden_size}, Hidden layers: {num_hidden}")
 
       input_layer = nn.Linear(input_size, hidden_size)
-      hidden_layers = [nn.Linear(hidden_size, hidden_size) for _ in range(num_layers - 1)]
+      hidden_layers = [nn.Linear(hidden_size, hidden_size) for _ in range(num_hidden - 1)]
       output_layer = nn.Linear(hidden_size, output_size)
 
       self.mlp = nn.Sequential(
