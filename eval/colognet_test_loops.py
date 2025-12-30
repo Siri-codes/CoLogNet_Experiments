@@ -45,8 +45,11 @@ def train_test_loop(dataset, model_type, depths, learning_rate, dropout, batch_s
     is_regression = True
 
   if model_type is Variant.MLP:
-    model = MLP(input_size, output_size, depths, dropout, num_hidden)
+    # Calculate target parameters based on ContNet architecture
+    target_params = calculate_parameters(input_size, output_size, depths)
+    model = MLP(input_size, output_size, target_params, dropout, num_hidden)
   elif model_type is Variant.SWIGLU:
+    target_params = calculate_parameters(input_size, output_size, depths)
     model = SwiGLUMLP(input_size, output_size, depths, dropout)
   else:
     model = ContNet_Model(model_type, input_size, output_size, depths, dropout)
@@ -83,18 +86,38 @@ def train_test_wandb():
 
         dataset = Dataset_Enum[config.dataset]
 
+        if dataset is Dataset_Enum.MNIST:
+            input_size = 784
+            output_size = 10
+        elif dataset is Dataset_Enum.WAVEFORM:
+            input_size = 40
+            output_size = 3
+        elif dataset is Dataset_Enum.BOSTON:
+            input_size = 13
+            output_size = 1
+
         max_params = config.max_params
         num_ladders = config.num_ladders
 
         if config.config_type == "Uniform":
-            base_depth = floor(max_params / num_ladders)
-            depths = [base_depth] * num_ladders
+            # subtract fixed combiner params first
+            remaining = max_params - (output_size * num_ladders + output_size)
+            # Solve for d: remaining = num_ladders * d * (input_size + 1)
+            base_depth = floor(remaining / (num_ladders * (input_size + 1)))
+            depths = [max(1, base_depth)] * num_ladders
         elif config.config_type == "Even_Odd":
-            base_depth = floor((max_params - (num_ladders / 2)) / num_ladders)
-            depths = [base_depth if i % 2 == 0 else base_depth + 1 for i in range(num_ladders)]
+            remaining_budget = max_params - (output_size * num_ladders + output_size)
+            # Total depth sum across all ladders if base_depth is d
+            # total_d = (base_depth * num_ladders) + (num_ladders // 2)
+            # Solve for base_depth:
+            base_depth = floor((remaining_budget / (input_size + 1) - (num_ladders // 2)) / num_ladders)
+            depths = [max(1, base_depth if i % 2 == 0 else base_depth + 1) for i in range(num_ladders)]
         elif config.config_type == "Pyramid":
-            base_depth = floor(max_params / (2 ** num_ladders))
-            depths = [base_depth + (i * 2) for i in range(num_ladders)]
+            remaining_budget = max_params - (output_size * num_ladders + output_size)
+            sum_increments = num_ladders * (num_ladders - 1)
+            # Solve for d: remaining_budget = (num_ladders * d + sum_increments) * (input_size + 1)
+            base_depth = floor((remaining_budget / (input_size + 1) - sum_increments) / num_ladders)
+            depths = [max(1, base_depth + (i * 2)) for i in range(num_ladders)]
 
         '''
         # 3 different depth configurations: Uniform, Even_Odd, Pyramid
@@ -111,6 +134,29 @@ def train_test_wandb():
         result_metric, total_params = train_test_loop(dataset, model_type, depths, config.lr, config.dropout, config.batch_size, num_epochs=50, weight_decay=1e-4, num_hidden=config.num_hidden)
            
         wandb.log({"score": result_metric, "total_params": total_params})
+
+@staticmethod
+def calculate_parameters(input_size, output_size, depths):
+  '''
+  Calculates the total number of parameters for a ContNet model given input size, output size, and ladder depths.
+
+  :param input_size: input size of the model
+  :param output_size: output size of the model
+  :param depths: list of ladder depths
+  '''
+
+  # 1. Calculate parameters for all ladders
+  # Each ladder 'l_i' has a weight matrix of (input_size * depth_i) and bias of (depth_i)
+  ladder_params_total = sum(d * input_size + d for d in depths)
+
+  # 2. Calculate parameters for the final combiner
+  # weight matrix: (output_size * sum(depths)), bias: (output_size)
+  combiner_params = output_size * len(depths) + output_size
+
+  # 3. Total Model Parameters
+  target_params = ladder_params_total + combiner_params
+
+  return target_params
 
 def eval_model(model, dataloader, is_regression=False, y_scaler=None):
   '''

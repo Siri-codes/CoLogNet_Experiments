@@ -9,20 +9,17 @@ class MLP(nn.Module):
   MLP neural network as control
   '''
 
-  def __init__(self, input_size, output_size, depths, dropout=0.1, num_hidden=1):
+  def __init__(self, input_size, output_size, target_params, dropout=0.1, num_hidden=1):
       """
       Args:
           input_size (int): Input features.
           output_size (int): Output features.
-          depths (list of int): List containing the depth for each ladder (e.g., [2, 3, 5, 8]).
+          target_parameters (int): Target number of parameters based on CoLogNet.
           dropout (float): Dropout rate.
           num_hidden (int): Number of hidden layers in the MLP.
       """
       super().__init__()
       self.output_size = output_size
-
-      # Calculate target parameters based on ContNet architecture
-      target_params = calculate_parameters(input_size, output_size, depths)
 
       # Solve for MLP hidden layer size (h):
       # MLP params = h * (input_size + 1 + output_size) + output_size
@@ -75,11 +72,10 @@ class MLP(nn.Module):
         return x
 
 class SwiGLUMLP(nn.Module):
-    def __init__(self, input_size, output_size, depths, dropout=0.1):
+    def __init__(self, input_size, output_size, target_params, dropout=0.1):
         super().__init__()
         self.output_size = output_size
-        target_params = calculate_parameters(input_size, output_size, depths)
-
+        
         # PARAMETER CALCULATION FOR SWIGLU:
         # Layer 1 (Up-projection): input_size * (2 * hidden) + (2 * hidden)
         # Layer 2 (Down-projection): hidden * output_size + (bias) output_size
@@ -125,27 +121,3 @@ class SwiGLU(nn.Module):
       # Split the input tensor into two halves along the last dimension
       x, gate = x.chunk(2, dim=-1)
       return x * F.silu(gate) #apply swish func to gate side & multiply with non-gate side
-
-
-@staticmethod
-def calculate_parameters(input_size, output_size, depths):
-  '''
-  Calculates the total number of parameters for a ContNet model given input size, output size, and ladder depths.
-
-  :param input_size: input size of the model
-  :param output_size: output size of the model
-  :param depths: list of ladder depths
-  '''
-
-  # 1. Calculate parameters for all ladders
-  # Each ladder 'l_i' has a weight matrix of (input_size * depth_i) and bias of (depth_i)
-  ladder_params_total = sum(d * input_size + d for d in depths)
-
-  # 2. Calculate parameters for the final combiner
-  # weight matrix: (output_size * sum(depths)), bias: (output_size)
-  combiner_params = output_size * len(depths) + output_size
-
-  # 3. Total Model Parameters
-  target_params = ladder_params_total + combiner_params
-
-  return target_params
