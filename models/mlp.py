@@ -38,7 +38,7 @@ class MLP(nn.Module):
       print(f"Calculated MLP Hidden Size: {hidden_size}, Hidden layers: {num_hidden}")
 
       input_layer = nn.Linear(input_size, hidden_size)
-      hidden_layers = [nn.Linear(hidden_size, hidden_size) for _ in range(num_hidden - 1)]
+      hidden_layers = [nn.Linear(hidden_size, hidden_size) for _ in range(num_hidden)]
       output_layer = nn.Linear(hidden_size, output_size)
 
       self.mlp = nn.Sequential(
