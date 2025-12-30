@@ -81,7 +81,21 @@ def train_test_wandb():
         model_type = Variant[config.model_type]
 
         dataset = Dataset_Enum[config.dataset]
-        
+
+        max_params = config.max_params
+        num_ladders = config.num_ladders
+
+        if config.config_type == "Uniform":
+            base_depth = math.floor(max_params / num_ladders)
+            depths = [base_depth] * num_ladders
+        elif config.config_type == "Even_Odd":
+            base_depth = math.floor((max_params - (num_ladders / 2)) / num_ladders)
+            depths = [base_depth if i % 2 == 0 else base_depth + 1 for i in range(num_ladders)]
+        elif config.config_type == "Pyramid":
+            base_depth = math.floor(max_params / (2 ** num_ladders))
+            depths = [base_depth + (i * 2) for i in range(num_ladders)]
+
+        '''
         # 3 different depth configurations: Uniform, Even_Odd, Pyramid
         #ex: if base_depth = 2 and num_ladders = 4
         if config.config_type == "Uniform": # [2, 2, 2, 2]
@@ -89,8 +103,9 @@ def train_test_wandb():
         elif config.config_type == "Even_Odd": # [2, 3, 2, 3]
             depths = [config.base_depth if i % 2 == 0 else config.base_depth + 1 
                       for i in range(config.num_ladders)]
-        elif config.config_type == "Pyramid": # [2, 4, 6, 8]
+        elif config.config_type == "Pyramid": # [2, 4, 6, 8] 
             depths = [config.base_depth + (i * 2) for i in range(config.num_ladders)]
+        '''
 
         result_metric, total_params = train_test_loop(dataset, model_type, depths, config.lr, config.dropout, config.batch_size, num_epochs=50, weight_decay=1e-4, num_hidden=config.num_hidden)
            
