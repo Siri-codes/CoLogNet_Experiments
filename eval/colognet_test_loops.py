@@ -82,7 +82,7 @@ def train_test_wandb():
 
         dataset = Dataset_Enum[config.dataset]
 
-        max_params = config.max_parameters
+        max_params = config.max_params
         num_ladders = config.num_ladders
 
         if config.config_type == "Uniform":
