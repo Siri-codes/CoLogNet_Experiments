@@ -12,7 +12,7 @@ from CoLogNet_Experiments.models.mlp import SwiGLUMLP
 from CoLogNet_Experiments.utils.train import train
 
 
-def train_test_loop(dataset, model_type, depths, learning_rate, dropout, batch_size, num_epochs, weight_decay=1e-4):
+def train_test_loop(dataset, model_type, depths, learning_rate, dropout, batch_size, num_epochs, weight_decay=1e-4, num_hidden):
   '''
   Docstring for train_test_loop
   Customizeable train/test loop: Trains and evaluates a model on the specified dataset with given hyperparameters.
@@ -44,7 +44,7 @@ def train_test_loop(dataset, model_type, depths, learning_rate, dropout, batch_s
     is_regression = True
 
   if model_type is Variant.MLP:
-    model = MLP(input_size, output_size, depths, dropout)
+    model = MLP(input_size, output_size, depths, dropout, num_hidden)
   elif model_type is Variant.SWIGLU:
     model = SwiGLUMLP(input_size, output_size, depths, dropout)
   else:
@@ -92,7 +92,7 @@ def train_test_wandb():
         elif config.config_type == "Pyramid": # [2, 4, 6, 8]
             depths = [config.base_depth + (i * 2) for i in range(config.num_ladders)]
 
-        result_metric, total_params = train_test_loop(dataset, model_type, depths, config.lr, config.dropout, config.batch_size, num_epochs=50, weight_decay=1e-4)
+        result_metric, total_params = train_test_loop(dataset, model_type, depths, config.lr, config.dropout, config.batch_size, num_epochs=50, weight_decay=1e-4, num_hidden=config.num_hidden)
            
         wandb.log({"score": result_metric, "total_params": total_params})
 

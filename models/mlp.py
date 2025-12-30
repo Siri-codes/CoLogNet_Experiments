@@ -9,7 +9,7 @@ class MLP(nn.Module):
   MLP neural network as control
   '''
 
-  def __init__(self, input_size, output_size, depths, dropout=0.1, num_hidden):
+  def __init__(self, input_size, output_size, depths, dropout=0.1, num_hidden=1):
       """
       Args:
           input_size (int): Input features.
