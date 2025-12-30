@@ -12,7 +12,7 @@ from CoLogNet_Experiments.models.mlp import SwiGLUMLP
 from CoLogNet_Experiments.utils.train import train
 
 
-def train_test_loop(dataset, model_type, depths, learning_rate, dropout, batch_size, num_epochs, weight_decay=1e-4, num_hidden):
+def train_test_loop(dataset, model_type, depths, learning_rate, dropout, batch_size, num_epochs, weight_decay=1e-4, num_hidden=1):
   '''
   Docstring for train_test_loop
   Customizeable train/test loop: Trains and evaluates a model on the specified dataset with given hyperparameters.
