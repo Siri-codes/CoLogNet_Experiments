@@ -87,13 +87,13 @@ def train_test_wandb():
         num_ladders = config.num_ladders
 
         if config.config_type == "Uniform":
-            base_depth = math.floor(max_params / num_ladders)
+            base_depth = floor(max_params / num_ladders)
             depths = [base_depth] * num_ladders
         elif config.config_type == "Even_Odd":
-            base_depth = math.floor((max_params - (num_ladders / 2)) / num_ladders)
+            base_depth = floor((max_params - (num_ladders / 2)) / num_ladders)
             depths = [base_depth if i % 2 == 0 else base_depth + 1 for i in range(num_ladders)]
         elif config.config_type == "Pyramid":
-            base_depth = math.floor(max_params / (2 ** num_ladders))
+            base_depth = floor(max_params / (2 ** num_ladders))
             depths = [base_depth + (i * 2) for i in range(num_ladders)]
 
         '''
