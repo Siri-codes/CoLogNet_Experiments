@@ -28,8 +28,8 @@ class MLP(nn.Module):
       # MLP params = h * (input_size + 1 + output_size) + output_size
       # --> h = (target_params - output_size) / (input_size + 1 + output_size)
       denom = input_size + 1 + output_size
-      total_hidden_size = math.ceil((target_params - output_size) / denom) #for fair play, round up to give MLP the advantage
-      hidden_size = total_hidden_size / num_hidden #divide total hidden size by number of hidden layers to get hidden size per layer
+      total_hidden_size = (target_params - output_size) / denom #for fair play, round up to give MLP the advantage
+      hidden_size = math.ceil(total_hidden_size / num_hidden) #divide total hidden size by number of hidden layers to get hidden size per layer
 
       if hidden_size <= 0: #hidden_size must be at least 1
           hidden_size = 1
