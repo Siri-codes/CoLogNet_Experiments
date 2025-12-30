@@ -21,15 +21,7 @@ class MLP(nn.Module):
       super().__init__()
       self.output_size = output_size
 
-      # Solve for MLP hidden layer size (h):
-      # MLP params = h * (input_size + 1 + output_size) + output_size
-      # --> h = (target_params - output_size) / (input_size + 1 + output_size)
-      denom = input_size + 1 + output_size
-      total_hidden_size = (target_params - output_size) / denom #for fair play, round up to give MLP the advantage
-      hidden_size = math.ceil(total_hidden_size / num_hidden) #divide total hidden size by number of hidden layers to get hidden size per layer
-
-      if hidden_size <= 0: #hidden_size must be at least 1
-          hidden_size = 1
+      hidden_size = calculate_mlp_hidden_size(target_params, input_size, output_size, num_hidden)
 
       print(f"Total ContNet Parameters: {target_params}") #print target params for comparison
       print(f"Calculated MLP Hidden Size: {hidden_size}, Hidden layers: {num_hidden}")
@@ -70,6 +62,27 @@ class MLP(nn.Module):
         if self.output_size == 1:
             return x.squeeze(-1)
         return x
+
+def calculate_mlp_hidden_size(target_params, input_size, output_size, num_layers):
+    # Case 1: 1 Hidden Layer (Linear Equation)
+    # P = H*(Input + Output + 1) + Output
+    if num_layers == 1:
+        h = (target_params - output_size) / (input_size + output_size + 1)
+        return math.ceil(max(1, h))
+
+    # Case 2: Multiple Hidden Layers (Quadratic Equation)
+    # aH^2 + bH + c = 0
+    a = num_layers - 1
+    b = input_size + output_size + num_layers
+    c = output_size - target_params
+
+    discriminant = b**2 - 4*a*c
+    if discriminant < 0:
+        return 1
+    
+    # math.ceil gives MLP slight advantage
+    h = (-b + math.sqrt(discriminant)) / (2 * a)
+    return math.ceil(max(1, h))
 
 class SwiGLUMLP(nn.Module):
     def __init__(self, input_size, output_size, target_params, dropout=0.1):
