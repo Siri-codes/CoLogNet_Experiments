@@ -13,7 +13,7 @@ from CoLogNet_Experiments.models.mlp import SwiGLUMLP
 from CoLogNet_Experiments.utils.train import train
 
 
-def train_test_loop(dataset, model_type, depths, learning_rate, dropout, batch_size, num_epochs, weight_decay=1e-4, num_hidden=1):
+def train_test_loop(dataset_enum, model_type, depths, learning_rate, dropout, batch_size, num_epochs, weight_decay=1e-4, num_hidden=1):
   '''
   Docstring for train_test_loop
   Customizeable train/test loop: Trains and evaluates a model on the specified dataset with given hyperparameters.
@@ -28,34 +28,17 @@ def train_test_loop(dataset, model_type, depths, learning_rate, dropout, batch_s
   :param weight_decay: weight decay (L2 regularization) for the optimizer
   '''
 
-  #get data loaders
-  train_loader, val_loader, test_loader, y_scaler = process_data(dataset, data_dir="./data", batch_size=batch_size)
+  #get dataset (train, test, val, specifies which dataset it is)
+  dataset = process_data(dataset_enum)
 
-  if dataset is Dataset_Enum.MNIST:
-    input_size = 784
-    output_size = 10
-    is_regression = False
-  elif dataset is Dataset_Enum.WAVEFORM:
-    input_size = 40
-    output_size = 3
-    is_regression = False
-  elif dataset is Dataset_Enum.BOSTON:
-    input_size = 13
-    output_size = 1
-    is_regression = True
+  input_size = dataset_enum.input_size
+  output_size = dataset_enum.output_size
+  is_regression = dataset_enum.is_regression
 
-  if model_type is Variant.MLP:
-    # Calculate target parameters based on ContNet architecture
-    target_params = calculate_parameters(input_size, output_size, depths)
-    model = MLP(input_size, output_size, target_params, dropout, num_hidden)
-  elif model_type is Variant.SWIGLU:
-    target_params = calculate_parameters(input_size, output_size, depths)
-    model = SwiGLUMLP(input_size, output_size, depths, dropout)
-  else:
-    model = ContNet_Model(model_type, input_size, output_size, depths, dropout)
+  model = get_model(model_type, input_size, output_size, depths, dropout, num_hidden)
 
   #train the model
-  history = train(model, train_loader, val_loader, num_epochs=num_epochs, lr=learning_rate, weight_decay=weight_decay, is_regression=is_regression)
+  history = train(dataset, model, num_epochs=num_epochs, lr=learning_rate, weight_decay=weight_decay)
   plot_loss_curves(history) #optional: plot loss curves
 
   total_params = sum(p.numel() for p in model.parameters() if p.requires_grad) 
@@ -63,7 +46,7 @@ def train_test_loop(dataset, model_type, depths, learning_rate, dropout, batch_s
   print("Total trainable parameters:", total_params) # optional: print total parameters
 
   # Evaluate on test set
-  result_metric = eval_model(model, test_loader, is_regression, y_scaler)
+  result_metric = eval_model(dataset, model, y_scaler)
 
   if is_regression:
       print(f"R2 Score: {result_metric}")
@@ -135,6 +118,26 @@ def train_test_wandb():
            
         wandb.log({"score": result_metric, "total_params": total_params})
 
+def get_model(model_type, input_size, output_size, depths, dropout, num_hidden):
+    '''
+    Get a model based on the specified model type and parameters.
+    :param model_type: the type of model to create
+    :param input_size: input size of the model
+    :param output_size: output size of the model
+    :param depths: list of ladder depths
+    '''
+    
+    if model_type is Variant.MLP:
+        # Calculate target parameters based on ContNet architecture
+        target_params = calculate_parameters(input_size, output_size, depths)
+        model = MLP(input_size, output_size, target_params, dropout, num_hidden)
+    elif model_type is Variant.SWIGLU:
+        target_params = calculate_parameters(input_size, output_size, depths)
+        model = SwiGLUMLP(input_size, output_size, depths, dropout)
+    else:
+        model = ContNet_Model(model_type, input_size, output_size, depths, dropout)
+
+
 @staticmethod
 def calculate_parameters(input_size, output_size, depths):
   '''
@@ -158,16 +161,19 @@ def calculate_parameters(input_size, output_size, depths):
 
   return target_params
 
-def eval_model(model, dataloader, is_regression=False, y_scaler=None):
+def eval_model(dataset, model):
   '''
   Docstring for eval_model
   Evaluates the model (accuracy for classification, R2 score for regression) on the provided dataloader.
   
+  :param dataset: the dataset to evaluate on (includes test set + y_scaler)
   :param model: the model to evaluate
-  :param dataloader: the dataloader containing the evaluation data
-  :param is_regression: Boolean indicating if the task is regression (True) or classification (False)
-  :param y_scaler: the scaler used to inverse transform the target values for regression tasks
+
   '''
+  is_regression = dataset.dataset_enum.is_regression
+  test_dataset = dataset.test_dataset
+  y_scaler = dataset.y_scaler
+
   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
   model.to(device)
   model.eval() # Set model to evaluation mode

@@ -3,12 +3,68 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-def train(model, dataloader, val_loader, num_epochs, lr, weight_decay, is_regression):
+def train(dataset, model, num_epochs, lr, weight_decay, batch_size):
 
     '''
     Trains a model on the given dataset.
     '''
 
+    dataset_enum = dataset.dataset_enum
+
+    if dataset_enum is Dataset_Enum.MNIST:
+        train_mnist(dataset.train_dataset, dataset.val_dataset, model, num_epochs, lr, weight_decay, batch_size)
+    elif dataset_enum is Dataset_Enum.WAVEFORM:
+        train_dataloader(dataset.train_dataset, dataset.val_dataset, is_regression=False, model, num_epochs, lr, weight_decay, batch_size)
+    elif dataset_enum is Dataset_Enum.BOSTON:
+        train_dataloader(dataset.train_dataset, dataset.val_dataset, is_regression=True, model, num_epochs, lr, weight_decay, batch_size)
+
+
+def train_dataloader(train_dataset, val_dataset, model, num_epochs, lr, weight_decay, batch_size):
+    '''
+    Trains a model using dataloader
+    '''
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+    return train_general(train_loader, val_loader, model, num_epochs, lr, weight_decay)
+        
+def train_mnist(train_dataset, val_dataset, model, num_epochs, lr, weight_decay, batch_size):
+    '''
+    Trains a model on the MNIST dataset without using a dataloader because that makes it take a long time
+    '''
+
+    # inputs and targets prepared as tensors
+    train_inputs_all_ts = torch.stack([train_dataset[i][0] for i in range(len(train_dataset))])
+    train_targets_all_ts = torch.tensor([train_dataset[i][1] for i in range(len(train_dataset))])
+
+    val_inputs_all_ts = torch.stack([val_dataset[i][0] for i in range(len(val_dataset))])
+    val_targets_all_ts = torch.stack([val_dataset[i][1] for i in range(len(val_dataset))])
+
+    train_gen = fast_batch_generator(train_inputs_all_ts, train_targets_all_ts, batch_size=batch_size)
+    val_gen = fast_batch_generator(val_inputs_all_ts, val_targets_all_ts, batch_size=batch_size, shuffle=False)
+        
+    return train_general(train_gen, val_gen, model, num_epochs, lr, weight_decay)
+
+def fast_batch_generator(inputs, targets, batch_size, shuffle=True, device="cuda"):
+    """Yields batches directly from tensors already on the device."""
+    num_samples = inputs.size(0)
+    # Move once to device for maximum speed
+    inputs, targets = inputs.to(device), targets.to(device)
+    
+    indices = torch.arange(num_samples, device=device)
+    if shuffle:
+        indices = indices[torch.randperm(num_samples)]
+    
+    for i in range(0, num_samples, batch_size):
+        batch_idx = indices[i : i + batch_size]
+        yield inputs[batch_idx], targets[batch_idx]
+
+
+def train_general(train_gen, val_gen, is_regression, model, num_epochs, lr, weight_decay):
+    '''
+    Trains a model using provided 'dataloaders'
+    '''
+    
     # Move model to GPU if available
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
@@ -37,7 +93,7 @@ def train(model, dataloader, val_loader, num_epochs, lr, weight_decay, is_regres
         train_running_mae = 0.0   # For mean absolute error (regression)
         total_samples = 0
 
-        for inputs, targets in dataloader:
+        for inputs, targets in train_gen:
             inputs, targets = inputs.to(device), targets.to(device)  # Move data to same device
 
             #Calculate loss by comparing predictions (outputs) vs. targets:
@@ -74,7 +130,7 @@ def train(model, dataloader, val_loader, num_epochs, lr, weight_decay, is_regres
         val_total_samples = 0
 
         with torch.no_grad(): # (saves memory + faster)
-            for inputs, targets in val_loader:
+            for inputs, targets in val_gen:
                 inputs, targets = inputs.to(device), targets.to(device)  # Move data to same device
 
                 outputs = model(inputs)
