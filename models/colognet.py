@@ -27,11 +27,32 @@ class Binarize_STE(torch.autograd.Function):
 def binarize_with_ste(x):
     return Binarize_STE.apply(x)
 
+class Euclidean_Distance(nn.Module):
+    def __init__(self, in_features, out_features):
+        def __init__(self, in_features, out_features):
+        super().__init__()
+
+        # like linear layer, has learnable weights (represent centroids?)
+        self.weight = nn.Parameter(torch.Tensor(out_features, in_features))
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        # common initialization for custom layers
+        nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+
+    def forward(self, x):
+        # x shape: (batch, in_features)
+        # weight shape: (out_features, in_features)
+        # unsqueeze to match cdist dims
+        # output shape: (batch, out_features)
+        return torch.cdist(x.unsqueeze(1), self.weight.unsqueeze(0), p=2).squeeze(1)
+
 #Continued Fraction/Logarithm Model Variants
 class Variant(Enum):
     COFRNET = "cofr"
     COLOGNET = "colog"
     COLOGNET_B = "colog_b" 
+    COLOGNET_E = "colog_e"
     MLP = "mlp"
     SWIGLU = "swiglu"
 
@@ -46,9 +67,14 @@ class ContNet_Model(nn.Module):
     - Continued logarithms, continuant form
     - Floating point
 
-    Variant 3: CoLogNetB
+    Variant 3: CoLogNet-B
     - Continued logarithms, continuant form
     - Outputs binarized before recurrence formula
+
+    Variant 4: CoLogNet-E
+    - Continued logarithms, continuant form
+    - Floating point
+    - Euclidean distance instead of dot product with weights to get coefficients
 
     All variants follow Ladder Structure:
         Given a list of depths [d_1, d_2, d_3, ..., d_n], creates n ladders
@@ -159,7 +185,7 @@ class Ladder(nn.Module):
 
         if model_type is Variant.COFRNET:
             C = X
-            epsilon = 0.1
+            epsilon = 0.01
         else:
             #(X, -10, 10) #clamp exponents between -10 and 10 for stability -- can change range if needed
             C = torch.pow(2, X) #raise 2^x for each value

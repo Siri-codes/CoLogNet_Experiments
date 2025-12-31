@@ -69,15 +69,42 @@ def train_test_wandb():
 
         dataset = Dataset_Enum[config.dataset]
 
-        if dataset is Dataset_Enum.MNIST:
-            input_size = 784
-            output_size = 10
-        elif dataset is Dataset_Enum.WAVEFORM:
-            input_size = 40
-            output_size = 3
-        elif dataset is Dataset_Enum.BOSTON:
-            input_size = 13
-            output_size = 1
+        input_size = dataset.input_size
+        output_size = dataset.output_size
+
+        base_depth = config.base_depth
+        num_ladders = config.num_ladders
+
+        # 3 different depth configurations: Uniform, Even_Odd, Pyramid
+        #ex: if base_depth = 2 and num_ladders = 4
+        if config.config_type == "Uniform": # [2, 2, 2, 2]
+            depths = [config.base_depth] * config.num_ladders
+        elif config.config_type == "Even_Odd": # [2, 3, 2, 3]
+            depths = [config.base_depth if i % 2 == 0 else config.base_depth + 1 for i in range(config.num_ladders)]
+        elif config.config_type == "Pyramid": # [2, 4, 6, 8] 
+            depths = [config.base_depth + (i * 2) for i in range(config.num_ladders)]
+        
+        result_metric, total_params = train_test_loop(dataset, model_type, depths, config.lr, config.dropout, config.batch_size, num_epochs=50, weight_decay=1e-4, num_hidden=config.num_hidden)
+           
+        wandb.log({"score": result_metric, "total_params": total_params})
+
+
+def train_test_wandb_lim_params():
+    '''
+    Docstring for train_test_wandb
+    Sets up and runs a training/testing loop with hyperparameters and accuracy logged to Weights & Biases (W&B).
+    '''
+
+    # Initialize a W&B run
+    with wandb.init() as run:
+        config = run.config # Retrieve hyperparameters from W&B config
+        
+        model_type = Variant[config.model_type]
+
+        dataset = Dataset_Enum[config.dataset]
+
+        input_size = dataset.input_size
+        output_size = dataset.output_size
 
         max_params = config.max_params
         num_ladders = config.num_ladders
@@ -160,4 +187,3 @@ def calculate_parameters(input_size, output_size, depths):
   target_params = ladder_params_total + combiner_params
 
   return target_params
-

@@ -50,20 +50,20 @@ def tabular_data_helper(df, target_col):
     :param target_col: name of target column
     '''
     # Split input features/target
-        X = df.drop(target_col, axis=1).values
-        y = df[target_col].values
+    X = df.drop(target_col, axis=1).values
+    y = df[target_col].values
 
-        # Split before scaling to avoid leakage (i.e. don't want test data in the training data)
-        X_train_val, X_test, y_train_val, y_test = train_test_split(X, y, test_size=0.2) #train/test
-        X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=0.2)  #train/val
+    # Split before scaling to avoid leakage (i.e. don't want test data in the training data)
+    X_train_val, X_test, y_train_val, y_test = train_test_split(X, y, test_size=0.2) #train/test
+    X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=0.2)  #train/val
 
-        # Normalize features so all contribute equally to result
-        scaler = StandardScaler() # standardization/Z score normalization: every pt has mean of 0, std of 1
-        X_train = scaler.fit_transform(X_train)
-        X_val = scaler.transform(X_val)
-        X_test = scaler.transform(X_test)
+    # Normalize features so all contribute equally to result
+    scaler = StandardScaler() # standardization/Z score normalization: every pt has mean of 0, std of 1
+    X_train = scaler.fit_transform(X_train)
+    X_val = scaler.transform(X_val)
+    X_test = scaler.transform(X_test)
 
-        return X_train, X_val, X_test, y_train, y_val, y_test
+    return X_train, X_val, X_test, y_train, y_val, y_test
 
 def to_tensor_ds(X_data, y_data, regression):  
     # helper: convert to TensorDataset
