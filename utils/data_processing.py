@@ -15,12 +15,13 @@ from torch.utils.data import Subset
 #Data Processing
 
 class Dataset:
-    def __init__(self, dataset_enum, train_dataset, val_dataset, test_dataset, y_scaler):
+    def __init__(self, dataset_enum, train_dataset, val_dataset, test_dataset, y_scaler, batch_size):
         self.dataset_enum = dataset_enum
         self.train_dataset = train_dataset
         self.val_dataset = val_dataset
         self.test_dataset = test_dataset
         self.y_scaler = y_scaler
+        self.batch_size = batch_size
 
 class Dataset_Enum(Enum):
     '''
@@ -39,7 +40,7 @@ class Dataset_Enum(Enum):
         self.output_size = output_size
         self.is_regression = is_regression
 
-def process_data(dataset_enum):
+def process_data(dataset_enum, batch_size):
     '''
     Returns dataset with proper train, test, and val datasets to be used for Dataloaders (Waveform, Boston) or directly for training (MNIST)
     Also has y_scaler for regression tasks (Boston)
@@ -53,10 +54,10 @@ def process_data(dataset_enum):
     elif dataset_enum == Dataset_Enum.BOSTON:
         train_dataset, val_dataset, test_dataset, y_scaler = process_data_boston()
     
-    return Dataset(dataset, train_dataset, val_dataset, test_dataset, y_scaler)
+    return Dataset(dataset_enum, train_dataset, val_dataset, test_dataset, y_scaler, batch_size)
     
 
-def process_data_mnist():
+def process_data_mnist(data_dir='/tmp/data'):
     '''
     # Train transform (includes augmentation)
     # augmentation teaches model to recognize digits even if they are slightly tilted or shifted
@@ -118,7 +119,7 @@ def process_data_mnist():
 
     return train_dataset, val_dataset, test_dataset, None
 
-def process_data_waveform():
+def process_data_waveform(data_dir='/tmp/data'):
     df = pd.read_csv('http://www.dropbox.com/s/qtdv1teptf097zl/waveformnoise.csv?dl=1')
     target_col = df.columns[-1]
 
@@ -131,7 +132,7 @@ def process_data_waveform():
     return train_dataset, val_dataset, test_dataset, None
 
 
-def process_data_boston():
+def process_data_boston(data_dir='/tmp/data'):
     df = pd.read_csv('https://raw.githubusercontent.com/selva86/datasets/refs/heads/master/BostonHousing.csv') #collect data
     target_col = 'medv'
 
