@@ -7,51 +7,6 @@ from CoLogNet_Experiments.utils.data_processing import Dataset_Enum
 from torch.utils.data import DataLoader
 from sklearn.metrics import r2_score
 
-
-def train(dataset, model, num_epochs, lr, weight_decay):
-
-    '''
-    Trains a model on the given dataset.
-    '''
-
-    dataset_enum = dataset.dataset_enum
-    batch_size = dataset.batch_size
-
-    if dataset_enum is Dataset_Enum.MNIST:
-        return train_mnist(dataset.train_dataset, dataset.val_dataset, False, model, num_epochs, lr, weight_decay, batch_size)
-    elif dataset_enum is Dataset_Enum.WAVEFORM:
-        return train_dataloader(dataset.train_dataset, dataset.val_dataset, False, model, num_epochs, lr, weight_decay, batch_size)
-    elif dataset_enum is Dataset_Enum.BOSTON:
-        return train_dataloader(dataset.train_dataset, dataset.val_dataset, True, model, num_epochs, lr, weight_decay, batch_size)
-
-
-def train_dataloader(train_dataset, val_dataset, model, num_epochs, lr, weight_decay, batch_size):
-    '''
-    Trains a model using dataloader
-    '''
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-
-    return train_general(train_loader, val_loader, model, num_epochs, lr, weight_decay)
-        
-def train_mnist(train_dataset, val_dataset, is_regression, model, num_epochs, lr, weight_decay, batch_size):
-    '''
-    Trains a model on the MNIST dataset without using a dataloader because that makes it take a long time
-    '''
-
-    # inputs and targets prepared as tensors
-    train_inputs = torch.stack([train_dataset[i][0] for i in range(len(train_dataset))])
-    train_targets = torch.tensor([train_dataset[i][1] for i in range(len(train_dataset))])
-
-    val_inputs = torch.stack([val_dataset[i][0] for i in range(len(val_dataset))])
-    val_targets = torch.tensor([val_dataset[i][1] for i in range(len(val_dataset))])
-
-    # Create the Fast Loader objects
-    train_loader = FastTensorLoader(train_inputs, train_targets, batch_size=batch_size, shuffle=True)
-    val_loader = FastTensorLoader(val_inputs, val_targets, batch_size=batch_size, shuffle=False)
-        
-    return train_general(train_loader, val_loader, is_regression, model, num_epochs, lr, weight_decay)
-    
 class FastTensorLoader:
     '''
     DataLoader-like object for a set of tensors.
@@ -196,32 +151,50 @@ def train_general(train_loader, val_loader, is_regression, model, num_epochs, lr
 
     return history
 
-def eval_model(dataset, model):
-  '''
-  Docstring for eval_model
-  Evaluates the model (accuracy for classification, R2 score for regression) on the provided dataloader.
-  
-  :param dataset: the dataset to evaluate on (includes test set + y_scaler)
-  :param model: the model to evaluate
+def train_mnist(train_dataset, val_dataset, is_regression, model, num_epochs, lr, weight_decay, batch_size):
+    '''
+    Trains a model on the MNIST dataset without using a dataloader because that makes it take a long time
+    '''
 
-  '''
+    # inputs and targets prepared as tensors
+    train_inputs = torch.stack([train_dataset[i][0] for i in range(len(train_dataset))])
+    train_targets = torch.tensor([train_dataset[i][1] for i in range(len(train_dataset))])
 
-  dataset_enum = dataset.dataset_enum
-  batch_size = dataset.batch_size
+    val_inputs = torch.stack([val_dataset[i][0] for i in range(len(val_dataset))])
+    val_targets = torch.tensor([val_dataset[i][1] for i in range(len(val_dataset))])
 
-  if dataset_enum is Dataset_Enum.MNIST:
-    test_inputs = torch.stack([dataset.test_dataset[i][0] for i in range(len(dataset.test_dataset))])
-    test_targets = torch.tensor([dataset.test_dataset[i][1] for i in range(len(dataset.test_dataset))])
-    test_loader = FastTensorLoader(test_inputs, test_targets, batch_size=batch_size, shuffle=False)
-  else:
-    test_loader = Dataloader(dataset.test_dataset, batch_size=batch_size, shuffle=False)
-    
-  is_regression = dataset_enum.is_regression
-  y_scaler = dataset.y_scaler
+    # Create the Fast Loader objects
+    train_loader = FastTensorLoader(train_inputs, train_targets, batch_size=batch_size, shuffle=True)
+    val_loader = FastTensorLoader(val_inputs, val_targets, batch_size=batch_size, shuffle=False)
+        
+    return train_general(train_loader, val_loader, is_regression, model, num_epochs, lr, weight_decay)
 
-  return eval_general(test_loader, is_regression, model, y_scaler)
+def train_dataloader(train_dataset, val_dataset, model, num_epochs, lr, weight_decay, batch_size):
+    '''
+    Trains a model using dataloader
+    '''
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
-def eval_general(test_loader, is_regression, model, y_scaler):
+    return train_general(train_loader, val_loader, model, num_epochs, lr, weight_decay)
+
+def train(dataset, model, num_epochs, lr, weight_decay):
+
+    '''
+    Trains a model on the given dataset.
+    '''
+
+    dataset_enum = dataset.dataset_enum
+    batch_size = dataset.batch_size
+
+    if dataset_enum is Dataset_Enum.MNIST:
+        return train_mnist(dataset.train_dataset, dataset.val_dataset, False, model, num_epochs, lr, weight_decay, batch_size)
+    elif dataset_enum is Dataset_Enum.WAVEFORM:
+        return train_dataloader(dataset.train_dataset, dataset.val_dataset, False, model, num_epochs, lr, weight_decay, batch_size)
+    elif dataset_enum is Dataset_Enum.BOSTON:
+        return train_dataloader(dataset.train_dataset, dataset.val_dataset, True, model, num_epochs, lr, weight_decay, batch_size)
+
+def eval_general(test_loader, is_regression, model, y_scaler): #helper for eval_model
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
@@ -263,3 +236,29 @@ def eval_general(test_loader, is_regression, model, y_scaler):
         return r2_score(targets, preds)
     else:
         return num_correct / num_total # Return accuracy (0 to 1)
+
+def eval_model(dataset, model):
+  '''
+  Docstring for eval_model
+  Evaluates the model (accuracy for classification, R2 score for regression) on the provided dataloader.
+  
+  :param dataset: the dataset to evaluate on (includes test set + y_scaler)
+  :param model: the model to evaluate
+
+  '''
+
+  dataset_enum = dataset.dataset_enum
+  batch_size = dataset.batch_size
+
+  if dataset_enum is Dataset_Enum.MNIST:
+    test_inputs = torch.stack([dataset.test_dataset[i][0] for i in range(len(dataset.test_dataset))])
+    test_targets = torch.tensor([dataset.test_dataset[i][1] for i in range(len(dataset.test_dataset))])
+    test_loader = FastTensorLoader(test_inputs, test_targets, batch_size=batch_size, shuffle=False)
+  else:
+    test_loader = Dataloader(dataset.test_dataset, batch_size=batch_size, shuffle=False)
+    
+  is_regression = dataset_enum.is_regression
+  y_scaler = dataset.y_scaler
+
+  return eval_general(test_loader, is_regression, model, y_scaler)
+

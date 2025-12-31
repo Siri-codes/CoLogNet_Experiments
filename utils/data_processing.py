@@ -40,22 +40,37 @@ class Dataset_Enum(Enum):
         self.output_size = output_size
         self.is_regression = is_regression
 
-def process_data(dataset_enum, batch_size):
+def tabular_data_helper(df, target_col):
     '''
-    Returns dataset with proper train, test, and val datasets to be used for Dataloaders (Waveform, Boston) or directly for training (MNIST)
-    Also has y_scaler for regression tasks (Boston)
+    Docstring for tabular_data_helper
+    split data into train, val, and test sets
+    normalize features for inputs only
 
+    :param df: dataframe containing data
+    :param target_col: name of target column
     '''
-    # DATA LOADING & PREPROCESSING
-    if dataset_enum == Dataset_Enum.MNIST: # MNIST
-        train_dataset, val_dataset, test_dataset, y_scaler = process_data_mnist()
-    elif dataset_enum == Dataset_Enum.WAVEFORM:
-        train_dataset, val_dataset, test_dataset, y_scaler = process_data_waveform()
-    elif dataset_enum == Dataset_Enum.BOSTON:
-        train_dataset, val_dataset, test_dataset, y_scaler = process_data_boston()
-    
-    return Dataset(dataset_enum, train_dataset, val_dataset, test_dataset, y_scaler, batch_size)
-    
+    # Split input features/target
+        X = df.drop(target_col, axis=1).values
+        y = df[target_col].values
+
+        # Split before scaling to avoid leakage (i.e. don't want test data in the training data)
+        X_train_val, X_test, y_train_val, y_test = train_test_split(X, y, test_size=0.2) #train/test
+        X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=0.2)  #train/val
+
+        # Normalize features so all contribute equally to result
+        scaler = StandardScaler() # standardization/Z score normalization: every pt has mean of 0, std of 1
+        X_train = scaler.fit_transform(X_train)
+        X_val = scaler.transform(X_val)
+        X_test = scaler.transform(X_test)
+
+        return X_train, X_val, X_test, y_train, y_val, y_test
+
+def to_tensor_ds(X_data, y_data, regression):  
+    # helper: convert to TensorDataset
+    return TensorDataset(
+        torch.tensor(X_data, dtype=torch.float32),
+        torch.tensor(y_data, dtype=torch.float32 if regression else torch.long) #ints for classification
+    )
 
 def process_data_mnist(data_dir='/tmp/data'):
     '''
@@ -152,28 +167,21 @@ def process_data_boston(data_dir='/tmp/data'):
 
     return train_dataset, val_dataset, test_dataset, None
 
-def tabular_data_helper(df, target_col):
-    # Split input features/target
-        X = df.drop(target_col, axis=1).values
-        y = df[target_col].values
+def process_data(dataset_enum, batch_size):
+    '''
+    Returns dataset with proper train, test, and val datasets to be used for Dataloaders (Waveform, Boston) or directly for training (MNIST)
+    Also has y_scaler for regression tasks (Boston)
 
-        # Split before scaling to avoid leakage (i.e. don't want test data in the training data)
-        X_train_val, X_test, y_train_val, y_test = train_test_split(X, y, test_size=0.2) #train/test
-        X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=0.2)  #train/val
-
-        # Normalize features so all contribute equally to result
-        scaler = StandardScaler() # standardization/Z score normalization: every pt has mean of 0, std of 1
-        X_train = scaler.fit_transform(X_train)
-        X_val = scaler.transform(X_val)
-        X_test = scaler.transform(X_test)
-
-        return X_train, X_val, X_test, y_train, y_val, y_test
-
-def to_tensor_ds(X_data, y_data, regression):  # helper: convert to TensorDataset
-    return TensorDataset(
-        torch.tensor(X_data, dtype=torch.float32),
-        torch.tensor(y_data, dtype=torch.float32 if regression else torch.long) #ints for classification
-    )
+    '''
+    # DATA LOADING & PREPROCESSING
+    if dataset_enum == Dataset_Enum.MNIST: # MNIST
+        train_dataset, val_dataset, test_dataset, y_scaler = process_data_mnist()
+    elif dataset_enum == Dataset_Enum.WAVEFORM:
+        train_dataset, val_dataset, test_dataset, y_scaler = process_data_waveform()
+    elif dataset_enum == Dataset_Enum.BOSTON:
+        train_dataset, val_dataset, test_dataset, y_scaler = process_data_boston()
+    
+    return Dataset(dataset_enum, train_dataset, val_dataset, test_dataset, y_scaler, batch_size)
 
 #Plotting Utils
 def plot_loss_curves(history):
