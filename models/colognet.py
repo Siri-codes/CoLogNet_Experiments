@@ -185,7 +185,7 @@ class Ladder(nn.Module):
 
         if model_type is Variant.COFRNET:
             C = X
-            epsilon = 0.01
+            epsilon = 0.1
         else:
             #(X, -10, 10) #clamp exponents between -10 and 10 for stability -- can change range if needed
             C = torch.pow(2, X) #raise 2^x for each value
