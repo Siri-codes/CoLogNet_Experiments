@@ -13,7 +13,7 @@ from CoLogNet_Experiments.models.mlp import SwiGLUMLP
 from CoLogNet_Experiments.utils.train import train
 
 
-def train_test_loop(dataset_enum, model_type, depths, learning_rate, dropout, batch_size, num_epochs, weight_decay=1e-4, num_hidden=1):
+def train_test_loop(dataset_enum, model_type, depths, learning_rate, dropout, batch_size, num_epochs, weight_decay=1e-4, num_hidden=1, logger=None):
   '''
   Docstring for train_test_loop
   Customizeable train/test loop: Trains and evaluates a model on the specified dataset with given hyperparameters.
@@ -38,7 +38,7 @@ def train_test_loop(dataset_enum, model_type, depths, learning_rate, dropout, ba
   model = get_model(model_type, input_size, output_size, depths, dropout, num_hidden)
 
   #train the model
-  history = train(model, train_loader, val_loader, is_regression, num_epochs=num_epochs, lr=learning_rate, weight_decay=weight_decay)
+  history = train(model, train_loader, val_loader, is_regression, num_epochs=num_epochs, lr=learning_rate, weight_decay=weight_decay, logger=logger)
   plot_loss_curves(history) #optional: plot loss curves
 
   total_params = sum(p.numel() for p in model.parameters() if p.requires_grad) 
@@ -53,7 +53,7 @@ def train_test_loop(dataset_enum, model_type, depths, learning_rate, dropout, ba
   else:
       print(f"Accuracy: {result_metric}")
 
-  return result_metric, total_params
+  return result_metric, total_params, model
 
 def train_test_wandb():
     '''
@@ -84,10 +84,24 @@ def train_test_wandb():
         elif config.config_type == "Pyramid": # [2, 4, 6, 8] 
             depths = [config.base_depth + (i * 2) for i in range(config.num_ladders)]
         
-        result_metric, total_params = train_test_loop(dataset, model_type, depths, config.lr, config.dropout, config.batch_size, num_epochs=50, weight_decay=1e-4, num_hidden=config.num_hidden)
-           
+        logger = Wandb_Logger()
+
+        result_metric, total_params, model = train_test_loop(dataset, model_type, depths, config.lr, config.dropout, config.batch_size, num_epochs=50, weight_decay=1e-4, num_hidden=config.num_hidden, logger=logger)
+        
         wandb.log({"score": result_metric, "total_params": total_params})
 
+
+class Wandb_Logger():
+    '''
+    Docstring for Wandb_Logger
+    Logger class for Weights & Biases (W&B).
+    '''
+
+    def __init__(self):
+        pass
+
+    def log(self, name, metrics):
+        wandb.log({name : metrics})
 
 def train_test_wandb_lim_params():
     '''
@@ -142,7 +156,12 @@ def train_test_wandb_lim_params():
         '''
 
         result_metric, total_params = train_test_loop(dataset, model_type, depths, config.lr, config.dropout, config.batch_size, num_epochs=50, weight_decay=1e-4, num_hidden=config.num_hidden)
-           
+        
+        # Log the model file as an artifact
+        artifact = wandb.Artifact("model-weights", type="model")
+        artifact.add_file("model.pt")
+        wandb.log_artifact(artifact)
+
         wandb.log({"score": result_metric, "total_params": total_params})
 
 def get_model(model_type, input_size, output_size, depths, dropout, num_hidden):

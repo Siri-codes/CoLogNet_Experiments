@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 from sklearn.metrics import r2_score
 
 
-def train(model, train_loader, val_loader, is_regression, num_epochs, lr, weight_decay):
+def train(model, train_loader, val_loader, is_regression, num_epochs, lr, weight_decay, logger=None):
     '''
     Trains a model using provided 'dataloaders'
     '''
@@ -114,12 +114,22 @@ def train(model, train_loader, val_loader, is_regression, num_epochs, lr, weight
         history['train_loss'].append(epoch_train_loss)
         history['train_acc'].append(epoch_train_accuracy)
 
+        #log if appropriate:
+        if logger is not None:
+            logger.log("train_loss", epoch_train_loss)
+            logger.log("train_acc", epoch_train_accuracy)
+
         avg_val_loss = val_running_loss / len(val_loader)
         history['val_loss'].append(avg_val_loss)
+
+        if logger is not None:
+            logger.log("val_loss", avg_val_loss)
 
         if not is_regression:
             avg_val_acc = val_correct / val_total_samples
             history['val_acc'].append(avg_val_acc)
+            if logger is not None:
+                logger.log("val_acc", avg_val_acc)
 
         print(f"Epoch {epoch}: Val Loss: {avg_val_loss:.4f}")
 

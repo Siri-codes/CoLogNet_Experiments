@@ -136,7 +136,7 @@ class Ladder(nn.Module):
         self.dropout = nn.Dropout(p=dropout) # optional dropout layer
         
     def forward(self, inputs):
-        # Coefficients: [batch, depth]
+      # Coefficients: [batch, depth]
       coeffs = self.norm(self.weight(inputs))
 
       # Binarize if CoLogB
