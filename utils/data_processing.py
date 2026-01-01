@@ -117,7 +117,8 @@ def process_data_cifar10(batch_size, data_dir='/tmp/data'):
     transform = v2.Compose([
         v2.ToImage(),                            # Convert to tensor image
         v2.ToDtype(torch.float32, scale=True),   # Convert to float and scale to [0, 1]
-        v2.Normalize(means, stds)
+        v2.Normalize(means, stds),
+        v2.Lambda(lambda x: torch.flatten(x))
     ])
 
     # Load the full train and test datasets

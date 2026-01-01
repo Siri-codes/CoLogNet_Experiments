@@ -21,6 +21,7 @@ dropout = 0.1 #recommended range: [0.0 - 0.5]
 batch_size = 200
 num_epochs = 30
 weight_decay = 1e-4
+num_hidden = 1 #only for MLP -- number of hidden layers
 
 def main():
     '''
