@@ -58,7 +58,7 @@ class FastTensorLoader:
     def __len__(self):
         return (self.num_samples + self.batch_size - 1) // self.batch_size
 
-def to_tensor_dataloader(dataset):
+def to_tensor_dataloader(dataset, batch_size):
     # inputs and targets prepared as tensors
     inputs = torch.stack([dataset[i][0] for i in range(len(dataset))])
     targets = torch.tensor([dataset[i][1] for i in range(len(dataset))])
@@ -176,9 +176,9 @@ def process_data_mnist(batch_size, data_dir='/tmp/data'):
     val_dataset = Subset(full_train, val_indices)
     test_dataset = datasets.MNIST(data_dir, train=False, download=True, transform=transform)
 
-    train_loader = to_tensor_dataloader(train_dataset)
-    val_loader = to_tensor_dataloader(val_dataset)
-    test_loader = to_tensor_dataloader(test_dataset)
+    train_loader = to_tensor_dataloader(train_dataset, batch_size)
+    val_loader = to_tensor_dataloader(val_dataset, batch_size)
+    test_loader = to_tensor_dataloader(test_dataset, batch_size)
 
     return train_loader, val_loader, test_loader, None
 

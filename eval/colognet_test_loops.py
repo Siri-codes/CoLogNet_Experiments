@@ -38,7 +38,7 @@ def train_test_loop(dataset_enum, model_type, depths, learning_rate, dropout, ba
   model = get_model(model_type, input_size, output_size, depths, dropout, num_hidden)
 
   #train the model
-  history = train(model, train_loader, val_loader, num_epochs=num_epochs, lr=learning_rate, weight_decay=weight_decay)
+  history = train(model, train_loader, val_loader, is_regression, num_epochs=num_epochs, lr=learning_rate, weight_decay=weight_decay)
   plot_loss_curves(history) #optional: plot loss curves
 
   total_params = sum(p.numel() for p in model.parameters() if p.requires_grad) 
@@ -46,7 +46,7 @@ def train_test_loop(dataset_enum, model_type, depths, learning_rate, dropout, ba
   print("Total trainable parameters:", total_params) # optional: print total parameters
 
   # Evaluate on test set
-  result_metric = eval_model(model, test_loader)
+  result_metric = eval_model(model, test_loader, is_regression, y_scaler)
 
   if is_regression:
       print(f"R2 Score: {result_metric}")
@@ -209,8 +209,8 @@ def eval_model(model, test_loader, is_regression, y_scaler):
             preds = y_scaler.inverse_transform(preds.reshape(-1, 1)).flatten()
             targets = y_scaler.inverse_transform(targets.reshape(-1, 1)).flatten()
 
-        print(f'PREDS: {preds}')
-        print(f'TARGETS: {targets}')
+        #print(f'PREDS: {preds}')
+        #print(f'TARGETS: {targets}')
 
         # Return R2 Score --- aiming for close to 1, with 0.7-0.9 considered a strong score
         return r2_score(targets, preds)
