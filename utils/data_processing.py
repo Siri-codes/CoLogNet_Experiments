@@ -14,15 +14,6 @@ from torch.utils.data import Subset
 
 #Data Processing
 
-class Dataset:
-    def __init__(self, dataset_enum, train_dataset, val_dataset, test_dataset, y_scaler, batch_size):
-        self.dataset_enum = dataset_enum
-        self.train_dataset = train_dataset
-        self.val_dataset = val_dataset
-        self.test_dataset = test_dataset
-        self.y_scaler = y_scaler
-        self.batch_size = batch_size
-
 class Dataset_Enum(Enum):
     '''
     Datasets used for testing:
@@ -39,6 +30,43 @@ class Dataset_Enum(Enum):
         self.input_size = input_size
         self.output_size = output_size
         self.is_regression = is_regression
+
+class FastTensorLoader:
+    '''
+    DataLoader-like object for a set of tensors.
+    In case of MNIST dataset, faster than DataLoader.
+
+    '''
+    def __init__(self, inputs, targets, batch_size=64, shuffle=True):
+        # Select device here to ensure tensors are moved immediately
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.inputs = inputs.to(self.device)
+        self.targets = targets.to(self.device)
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+        self.num_samples = self.inputs.size(0)
+
+    def __iter__(self):
+        indices = torch.arange(self.num_samples, device=self.device)
+        if self.shuffle:
+            indices = indices[torch.randperm(self.num_samples)]
+        
+        for i in range(0, self.num_samples, self.batch_size):
+            batch_idx = indices[i : i + self.batch_size]
+            yield self.inputs[batch_idx], self.targets[batch_idx]
+
+    def __len__(self):
+        return (self.num_samples + self.batch_size - 1) // self.batch_size
+
+def to_tensor_dataloader(dataset):
+    # inputs and targets prepared as tensors
+    inputs = torch.stack([dataset[i][0] for i in range(len(dataset))])
+    targets = torch.tensor([dataset[i][1] for i in range(len(dataset))])
+
+    # Create the Fast Loader objects
+    fast_loader = FastTensorLoader(inputs, targets, batch_size=batch_size, shuffle=True)
+    
+    return fast_loader
 
 def tabular_data_helper(df, target_col):
     '''
@@ -72,7 +100,24 @@ def to_tensor_ds(X_data, y_data, regression):
         torch.tensor(y_data, dtype=torch.float32 if regression else torch.long) #ints for classification
     )
 
-def process_data_mnist(data_dir='/tmp/data'):
+def process_data(dataset_enum, batch_size):
+    '''
+    Returns dataset with proper train, test, and val datasets to be used for Dataloaders (Waveform, Boston) or directly for training (MNIST)
+    Also has y_scaler for regression tasks (Boston)
+
+    '''
+    # DATA LOADING & PREPROCESSING
+    if dataset_enum == Dataset_Enum.MNIST: # MNIST
+        train_loader, val_loader, test_loader, y_scaler = process_data_mnist(batch_size)
+    elif dataset_enum == Dataset_Enum.WAVEFORM:
+        train_loader, val_loader, test_loader, y_scaler  = process_data_waveform(batch_size)
+    elif dataset_enum == Dataset_Enum.BOSTON:
+        train_loader, val_loader, test_loader, y_scaler  = process_data_boston(batch_size)
+    
+    return train_loader, val_loader, test_loader, y_scaler
+
+
+def process_data_mnist(batch_size, data_dir='/tmp/data'):
     '''
     # Train transform (includes augmentation)
     # augmentation teaches model to recognize digits even if they are slightly tilted or shifted
@@ -129,10 +174,13 @@ def process_data_mnist(data_dir='/tmp/data'):
     # Create datasets using shared indices and different (augmented/real) versions of data
     train_dataset = Subset(full_train, train_indices)
     val_dataset = Subset(full_train, val_indices)
-
     test_dataset = datasets.MNIST(data_dir, train=False, download=True, transform=transform)
 
-    return train_dataset, val_dataset, test_dataset, None
+    train_loader = to_tensor_dataloader(train_dataset)
+    val_loader = to_tensor_dataloader(val_dataset)
+    test_loader = to_tensor_dataloader(test_dataset)
+
+    return train_loader, val_loader, test_loader, None
 
 def process_data_waveform(data_dir='/tmp/data'):
     df = pd.read_csv('http://www.dropbox.com/s/qtdv1teptf097zl/waveformnoise.csv?dl=1')
@@ -144,7 +192,11 @@ def process_data_waveform(data_dir='/tmp/data'):
     val_dataset = to_tensor_ds(X_val, y_val, False)
     test_dataset = to_tensor_ds(X_test, y_test, False)
 
-    return train_dataset, val_dataset, test_dataset, None
+    train_loader = Dataloader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = Dataloader(val_dataset, batch_size=batch_size, shuffle=True)
+    test_loader = Dataloader(test_dataset, batch_size=batch_size, shuffle=True)
+
+    return train_loader, val_loader, test_loader, None
 
 
 def process_data_boston(data_dir='/tmp/data'):
@@ -165,23 +217,11 @@ def process_data_boston(data_dir='/tmp/data'):
     val_dataset = to_tensor_ds(X_val, y_val, True)
     test_dataset = to_tensor_ds(X_test, y_test, True)
 
-    return train_dataset, val_dataset, test_dataset, None
+    train_loader = Dataloader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = Dataloader(val_dataset, batch_size=batch_size, shuffle=True)
+    test_loader = Dataloader(test_dataset, batch_size=batch_size, shuffle=True)
 
-def process_data(dataset_enum, batch_size):
-    '''
-    Returns dataset with proper train, test, and val datasets to be used for Dataloaders (Waveform, Boston) or directly for training (MNIST)
-    Also has y_scaler for regression tasks (Boston)
-
-    '''
-    # DATA LOADING & PREPROCESSING
-    if dataset_enum == Dataset_Enum.MNIST: # MNIST
-        train_dataset, val_dataset, test_dataset, y_scaler = process_data_mnist()
-    elif dataset_enum == Dataset_Enum.WAVEFORM:
-        train_dataset, val_dataset, test_dataset, y_scaler = process_data_waveform()
-    elif dataset_enum == Dataset_Enum.BOSTON:
-        train_dataset, val_dataset, test_dataset, y_scaler = process_data_boston()
-    
-    return Dataset(dataset_enum, train_dataset, val_dataset, test_dataset, y_scaler, batch_size)
+    return train_loader, val_loader, test_loader, y_scaler
 
 #Plotting Utils
 def plot_loss_curves(history):
@@ -204,4 +244,4 @@ def plot_loss_curves(history):
     plt.ylabel('Loss')
     plt.legend()
     plt.grid(True)
-    plt.show()
+    plt.show() 

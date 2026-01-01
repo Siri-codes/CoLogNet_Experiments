@@ -10,7 +10,7 @@ from CoLogNet_Experiments.utils.data_processing import Dataset_Enum, process_dat
 from CoLogNet_Experiments.models.colognet import ContNet_Model, Variant
 from CoLogNet_Experiments.models.mlp import MLP
 from CoLogNet_Experiments.models.mlp import SwiGLUMLP
-from CoLogNet_Experiments.utils.train import train, eval_model
+from CoLogNet_Experiments.utils.train import train
 
 
 def train_test_loop(dataset_enum, model_type, depths, learning_rate, dropout, batch_size, num_epochs, weight_decay=1e-4, num_hidden=1):
@@ -18,7 +18,7 @@ def train_test_loop(dataset_enum, model_type, depths, learning_rate, dropout, ba
   Docstring for train_test_loop
   Customizeable train/test loop: Trains and evaluates a model on the specified dataset with given hyperparameters.
   
-  :param dataset: the dataset to use (e.g., Dataset_Enum.MNIST)
+  :param dataset: the dataset to use (not necesarily one of the standard enums)
   :param model_type: the type of model to use (e.g., Variant.MLP)
   :param depths: list specifying the depth of each layer in the model
   :param learning_rate: learning rate for the optimizer
@@ -29,7 +29,7 @@ def train_test_loop(dataset_enum, model_type, depths, learning_rate, dropout, ba
   '''
 
   #get dataset (train, test, val, specifies which dataset it is)
-  dataset = process_data(dataset_enum, batch_size)
+  train_loader, val_loader, test_loader, y_scaler = process_data(dataset_enum, batch_size)
 
   input_size = dataset_enum.input_size
   output_size = dataset_enum.output_size
@@ -38,7 +38,7 @@ def train_test_loop(dataset_enum, model_type, depths, learning_rate, dropout, ba
   model = get_model(model_type, input_size, output_size, depths, dropout, num_hidden)
 
   #train the model
-  history = train(dataset, model, num_epochs=num_epochs, lr=learning_rate, weight_decay=weight_decay)
+  history = train(model, train_loader, val_loader, num_epochs=num_epochs, lr=learning_rate, weight_decay=weight_decay)
   plot_loss_curves(history) #optional: plot loss curves
 
   total_params = sum(p.numel() for p in model.parameters() if p.requires_grad) 
@@ -46,7 +46,7 @@ def train_test_loop(dataset_enum, model_type, depths, learning_rate, dropout, ba
   print("Total trainable parameters:", total_params) # optional: print total parameters
 
   # Evaluate on test set
-  result_metric = eval_model(dataset, model)
+  result_metric = eval_model(model, test_loader)
 
   if is_regression:
       print(f"R2 Score: {result_metric}")
@@ -164,6 +164,59 @@ def get_model(model_type, input_size, output_size, depths, dropout, num_hidden):
     else:
         model = ContNet_Model(model_type, input_size, output_size, depths, dropout)
     return model
+
+def eval_model(model, test_loader, is_regression, y_scaler): 
+
+    '''
+    Docstring for eval_model
+    Evaluates the model (accuracy for classification, R2 score for regression) on the provided dataloader.
+    
+    :param dataset: the dataset to evaluate on (includes test set + y_scaler)
+    :param model: the model to evaluate
+
+    '''
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+    model.eval() # Set model to evaluation mode
+
+    num_correct = 0
+    num_total = 0
+    all_preds = []
+    all_labels = []
+
+    with torch.no_grad():
+        for inputs, labels in test_loader:
+            inputs, labels = inputs.to(device), labels.to(device)
+            outputs = model(inputs)
+
+            if is_regression:
+                # Store values to calculate R2 or MSE later
+                all_preds.append(outputs.cpu())
+                all_labels.append(labels.cpu())
+            else:
+                # Classification logic
+                _, predicted = torch.max(outputs, 1)
+                num_correct += (predicted == labels).sum().item()
+                num_total += labels.size(0)
+
+    if is_regression:
+        preds = torch.cat(all_preds).numpy()
+        targets = torch.cat(all_labels).numpy()
+
+        # Convert back to original scale if scaler is provided
+        if y_scaler is not None:
+            preds = y_scaler.inverse_transform(preds.reshape(-1, 1)).flatten()
+            targets = y_scaler.inverse_transform(targets.reshape(-1, 1)).flatten()
+
+        print(f'PREDS: {preds}')
+        print(f'TARGETS: {targets}')
+
+        # Return R2 Score --- aiming for close to 1, with 0.7-0.9 considered a strong score
+        return r2_score(targets, preds)
+    else:
+        return num_correct / num_total # Return accuracy (0 to 1)
+
 
 @staticmethod
 def calculate_parameters(input_size, output_size, depths):

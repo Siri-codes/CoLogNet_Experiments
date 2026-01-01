@@ -27,9 +27,8 @@ class Binarize_STE(torch.autograd.Function):
 def binarize_with_ste(x):
     return Binarize_STE.apply(x)
 
-class Euclidean_Distance(nn.Module):
+class Euclidean_Distance_Layer(nn.Module):
     def __init__(self, in_features, out_features):
-        def __init__(self, in_features, out_features):
         super().__init__()
 
         # like linear layer, has learnable weights (represent centroids?)
@@ -117,7 +116,7 @@ class ContNet_Model(nn.Module):
         :param inputs: 2D input vector [input_size, batch_size]
         '''
         # Get outputs from each ladder
-        output = torch.stack([ladder(inputs) for ladder in self.layers], dim=1)
+        output = torch.stack([ladder(inputs) for ladder in self.layers], dim=1) # [batch, num_ladders]
 
         # Apply final linear layer
         output = self.final_layer(output)
@@ -132,7 +131,7 @@ class Ladder(nn.Module):
         self.input_size = input_size
         self.depth = depth
 
-        self.weight = nn.Linear(input_size, depth) #linear layer to get coefficients
+        self.weight = EuclideanDistanceLayer(input_size, depth) if model_type is Variant.COLOGNET_E else nn.Linear(input_size, depth) #linear layer to get coefficients
         self.norm = nn.LayerNorm(depth) #normalization layer
         self.dropout = nn.Dropout(p=dropout) # optional dropout layer
         
