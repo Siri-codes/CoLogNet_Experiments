@@ -1,9 +1,47 @@
-#W&B TESTING SCRIPT:
+"""
+Weights & Biases Testing Script
 
+"""
 import wandb
 import os
 from CoLogNet_Experiments.eval.colognet_test_loops import train_test_wandb
 
+#some useful sweep configurations:
+sweep_config_bayes_mlp = {
+    'method': 'bayes',  # Grid search: iterates through all combinations
+    'metric': {'name': 'score', 'goal': 'maximize'},  # maximizing accuracy
+    'parameters': {
+        'dataset': {'values': ['MNIST']},
+        'model_type': {'values': ['MLP']},
+        'lr': {'distribution': 'log_uniform_values',
+               'min': 0.001,
+               'max': 0.05},
+        'num_ladders' : {'values': [1]}, #for mlp num_ladders doesn't matter
+        'max_params': {'values': [6000]},  # restrict # of total parameters model can use
+        'config_type': {'values': ['Even_Odd']},
+        'batch_size': {'values': [64, 128, 256, 512]},
+        'dropout': {'values': [0.0, 0.1, 0.2]},
+        'num_hidden': {'values': [1, 2, 3]}
+    }
+}
+sweep_config_grid = {
+    'method': 'grid',  # Grid search: iterates through all combinations
+    'metric': {'name': 'score', 'goal': 'maximize'},  # maximizing accuracy
+    'parameters': {
+        'dataset': {'values': ['MNIST']},
+        'model_type': {'values': ['MLP', 'COFRNET', 'COLOGNET']},
+        'lr': {'values': [0.001, 0.005, 0.01, 0.05]},
+        'num_ladders' : {'values': [3, 4, 7, 8, 11, 12, 15, 16]}, #for mlp num_ladders doesn't matter
+        'base_depth': {'values': [3, 4, 7, 8]},  # restrict # of total parameters model can use
+        'config_type': {'values': ['Even_Odd']},
+        'batch_size': {'values': [128, 256, 512]},
+        'dropout': {'values': [0.0, 0.1, 0.2]},
+        'num_hidden': {'values': [1]}
+    }
+}
+
+WANDB_ENTITY = "colognet-project" 
+WANDB_PROJECT = "CoLogNet_Experiments"
 sweep_file = "sweep_id.txt"
 
 def get_or_create_sweep_id():
@@ -15,24 +53,14 @@ def get_or_create_sweep_id():
     if os.path.exists(sweep_file):
         with open(sweep_file, "r") as f:
             sweep_id = f.read().strip()
-        print(f">>> Resuming existing sweep: {sweep_id}")
-        return sweep_id
+
+        # Format the ID to include entity and project to ensure it is found
+        full_sweep_id = f"{WANDB_ENTITY}/{WANDB_PROJECT}/{sweep_id}"
+        print(f">>> Resuming existing sweep: {full_sweep_id}")
+        return full_sweep_id
 
     # Choose which parameters to iterate over:
-    sweep_config = {
-        'method': 'grid',  # Grid search: iterates through all combinations
-        'metric': {'name': 'accuracy', 'goal': 'maximize'}, # maximizing accuracy
-        'parameters': {
-            'dataset': {'values': ['MNIST', 'WAVEFORM', 'BOSTON']},
-            'model_type': {'values': ['MLP', 'SWIGLU', 'COFRNET','COLOGNET', 'COLOGNET_B']},
-            'lr': {'values': [0.0005, 0.001, 0.005, 0.01]},
-            'num_ladders': {'values': [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]},
-            'base_depth': {'values': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}, 
-            'config_type': {'values': ['Uniform', 'Even_Odd', 'Pyramid']},
-            'batch_size': {'values': [256, 512]},
-            'dropout': {'values': [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]},
-        }
-    }
+    sweep_config = sweep_config_grid
 
     # If not found, create a new sweep
     sweep_id = wandb.sweep(sweep_config, project="CoLogNet_Experiments")
@@ -41,7 +69,9 @@ def get_or_create_sweep_id():
         f.write(sweep_id)
 
     print(f"Created new sweep ID: {sweep_id}")
-    return sweep_id
+
+    # For the first run, return the full path
+    return f"{WANDB_ENTITY}/{WANDB_PROJECT}/{sweep_id}"
 
 def main():
     '''

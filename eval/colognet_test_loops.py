@@ -1,4 +1,11 @@
-#TRAIN/TEST LOOPS
+"""
+Train/test loops
+
+Includes:
+- A general train_test_loop for customized hyperparameter testing
+- A Weights & Biases train_test_loop for hyperparameter optimization (one version with a parameter limit)
+
+"""
 
 import torch # import main library
 from sklearn.metrics import r2_score
@@ -6,12 +13,12 @@ from sklearn.metrics import r2_score
 import wandb
 from math import floor
 
-from CoLogNet_Experiments.utils.data_processing import Dataset_Enum, process_data, plot_loss_curves
+from CoLogNet_Experiments.utils.data_processing import Dataset_Enum, process_data
+from CoLogNet_Experiments.utils.plotting import plot_loss_curves
+from CoLogNet_Experiments.utils.train import train
 from CoLogNet_Experiments.models.colognet import ContNet_Model, Variant
 from CoLogNet_Experiments.models.mlp import MLP
 from CoLogNet_Experiments.models.mlp import SwiGLUMLP
-from CoLogNet_Experiments.utils.train import train
-
 
 def train_test_loop(dataset_enum, model_type, depths, learning_rate, dropout, batch_size, num_epochs, weight_decay=1e-4, num_hidden=1, logger=None):
   '''

@@ -1,3 +1,5 @@
+import matplotlib.pyplot as plt
+
 #Plotting Utils
 def plot_loss_curves(history):
     '''
