@@ -36,7 +36,6 @@ class Dataset_Enum(Enum):
         self.output_size = output_size
         self.is_regression = is_regression
 
-#Dataloaders:
 class FastTensorLoader:
     '''
     DataLoader-like object for a set of tensors.
@@ -73,6 +72,98 @@ def to_tensor_dataloader(dataset, batch_size):
     fast_loader = FastTensorLoader(inputs, targets, batch_size=batch_size, shuffle=True)
     
     return fast_loader
+
+
+#DATA LOADING AND PROCESSING:
+def process_data(dataset_enum, batch_size):
+    '''
+    Returns dataset with proper train, test, and val datasets to be used for Dataloaders (Waveform, Boston) or directly for training (MNIST)
+    Also has y_scaler for regression tasks (Boston)
+
+    '''
+    if dataset_enum is Dataset_Enum.MNIST: # MNIST
+        train_loader, val_loader, test_loader, y_scaler = process_data_mnist(batch_size)
+    elif dataset_enum is Dataset_Enum.CIFAR10:
+        train_loader, val_loader, test_loader, y_scaler = process_data_cifar10(batch_size)
+    elif dataset_enum is Dataset_Enum.WAVEFORM:
+        train_loader, val_loader, test_loader, y_scaler  = process_data_waveform(batch_size)
+    elif dataset_enum is Dataset_Enum.BOSTON:
+        train_loader, val_loader, test_loader, y_scaler  = process_data_boston(batch_size)
+    
+    return train_loader, val_loader, test_loader, y_scaler
+
+def process_data_mnist(batch_size, data_dir='/tmp/data'):
+
+    # Simple version without augmentation for simplicity/speed
+    transform = v2.Compose([
+        v2.ToImage(),
+        v2.ToDtype(torch.float32, scale=True),
+        v2.Normalize((0.1307,), (0.3081,)),
+        v2.Lambda(lambda x: torch.flatten(x))
+    ])
+
+    # Load datasets
+    full_train = datasets.MNIST(data_dir, train=True, download=True, transform=transform)
+    test_dataset = datasets.MNIST(data_dir, train=False, download=True, transform=transform)
+
+    return process_data_custom_dataloader(full_train, test_dataset, batch_size)
+
+def process_data_cifar10(batch_size, data_dir='/tmp/data'):
+    
+    # CIFAR10 normalization stats
+    means = (0.4914, 0.4822, 0.4465)
+    stds = (0.2470, 0.2435, 0.2616)
+
+    # standard transform (no augmentation)
+    transform = v2.Compose([
+        v2.ToImage(),                            # Convert to tensor image
+        v2.ToDtype(torch.float32, scale=True),   # Convert to float and scale to [0, 1]
+        v2.Normalize(means, stds)
+    ])
+
+    # Load the full train and test datasets
+    full_train_dataset = datasets.CIFAR10(root=data_dir, train=True, download=True, transform=transform)
+    test_dataset = datasets.CIFAR10(root=data_dir, train=False, download=True, transform=transform)
+
+    return process_data_custom_dataloader(full_train_dataset, test_dataset, batch_size)
+
+
+def process_data_custom_dataloader(full_train, test_dataset, batch_size, val_split=0.1, data_dir='/tmp/data'):
+    '''
+    Docstring for process_data_custom_dataloader
+    Split data into train, val, and test sets
+    Create custom dataloaders for each set (not pytorch Dataloader bc slower for MNIST and CIFAR10)
+    '''
+
+    # Stratified train/val split 
+    train_idx, val_idx = train_test_split(
+        range(len(full_train)),
+        test_size=val_split,
+        stratify=full_train.targets, # Keeps 10% of EACH digit for validation
+        random_state=42
+    )
+
+    train_dataset = Subset(full_train, train_idx)
+    val_dataset = Subset(full_train, val_idx)
+
+    train_loader = to_tensor_dataloader(train_dataset, batch_size)
+    val_loader = to_tensor_dataloader(val_dataset, batch_size)
+    test_loader = to_tensor_dataloader(test_dataset, batch_size)
+
+    return train_loader, val_loader, test_loader, None
+
+def process_data_waveform(data_dir='/tmp/data'):
+    df = pd.read_csv('http://www.dropbox.com/s/qtdv1teptf097zl/waveformnoise.csv?dl=1')
+    target_col = df.columns[-1]
+
+    return tabular_data_helper(df, target_col, False)
+
+
+def process_data_boston(data_dir='/tmp/data'):
+    df = pd.read_csv('https://raw.githubusercontent.com/selva86/datasets/refs/heads/master/BostonHousing.csv') #collect data
+    target_col = 'medv'
+
+    return tabular_data_helper(df, target_col, True)
 
 def tabular_data_helper(df, target_col, is_regression):
     '''
@@ -120,123 +211,10 @@ def tabular_data_helper(df, target_col, is_regression):
 
     return train_loader, val_loader, test_loader, y_scaler
 
+
 def to_tensor_ds(X_data, y_data, regression):  
     # helper: convert to TensorDataset
     return TensorDataset(
         torch.tensor(X_data, dtype=torch.float32),
         torch.tensor(y_data, dtype=torch.float32 if regression else torch.long) #ints for classification
     )
-
-def process_data(dataset_enum, batch_size):
-    '''
-    Returns dataset with proper train, test, and val datasets to be used for Dataloaders (Waveform, Boston) or directly for training (MNIST)
-    Also has y_scaler for regression tasks (Boston)
-
-    '''
-    # DATA LOADING & PREPROCESSING
-    if dataset_enum is Dataset_Enum.MNIST: # MNIST
-        train_loader, val_loader, test_loader, y_scaler = process_data_mnist(batch_size)
-    elif dataset_enum is Dataset_Enum.CIFAR10:
-        train_loader, val_loader, test_loader, y_scaler = process_data_cifar10(batch_size)
-    elif dataset_enum is Dataset_Enum.WAVEFORM:
-        train_loader, val_loader, test_loader, y_scaler  = process_data_waveform(batch_size)
-    elif dataset_enum is Dataset_Enum.BOSTON:
-        train_loader, val_loader, test_loader, y_scaler  = process_data_boston(batch_size)
-    
-    return train_loader, val_loader, test_loader, y_scaler
-
-
-def process_data_custom_dataloader(full_train, test_dataset, batch_size, data_dir='/tmp/data'):
-    '''
-    Docstring for process_data_custom_dataloader
-    Split data into train, val, and test sets
-    Create custom dataloaders for each set (not pytorch Dataloader bc slower for MNIST and CIFAR10)
-    '''
-
-    # Stratified train/val split 
-    train_idx, val_idx = train_test_split(
-        range(len(full_train)),
-        test_size=val_split,
-        stratify=full_train.targets, # Keeps 10% of EACH digit for validation
-        random_state=42
-    )
-
-    train_dataset = Subset(full_train, train_idx)
-    val_dataset = Subset(full_train, val_idx)
-
-    train_loader = to_tensor_dataloader(train_dataset, batch_size)
-    val_loader = to_tensor_dataloader(val_dataset, batch_size)
-    test_loader = to_tensor_dataloader(test_dataset, batch_size)
-
-    return train_loader, val_loader, test_loader, None
-
-
-def process_data_mnist(batch_size, data_dir='/tmp/data'):
-
-    # Simple version without augmentation for simplicity/speed
-    transform = v2.Compose([
-        v2.ToImage(),
-        v2.ToDtype(torch.float32, scale=True),
-        v2.Normalize((0.1307,), (0.3081,)),
-        v2.Lambda(lambda x: torch.flatten(x))
-    ])
-
-    # Load datasets
-    full_train = datasets.MNIST(data_dir, train=True, download=True, transform=transform)
-    test_dataset = datasets.MNIST(data_dir, train=False, download=True, transform=transform)
-
-    return process_data_custom_dataloader(full_train, test_dataset, batch_size)
-
-def process_data_cifar10(batch_size, data_dir='/tmp/data'):
-    
-    # CIFAR10 normalization stats
-    means = (0.4914, 0.4822, 0.4465)
-    stds = (0.2470, 0.2435, 0.2616)
-
-    # standard transform (no augmentation)
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize(means, stds),
-    ])
-
-    # Load the full train and test datasets
-    full_train_dataset = datasets.CIFAR10(root=data_dir, train=True, download=True, transform=transform)
-    test_dataset = datasets.CIFAR10(root=data_dir, train=False, download=True, transform=transform)
-
-    return process_data_custom_dataloader(full_train_dataset, test_dataset, batch_size)
-
-def process_data_waveform(data_dir='/tmp/data'):
-    df = pd.read_csv('http://www.dropbox.com/s/qtdv1teptf097zl/waveformnoise.csv?dl=1')
-    target_col = df.columns[-1]
-
-    return tabular_data_helper(df, target_col, False)
-
-
-def process_data_boston(data_dir='/tmp/data'):
-    df = pd.read_csv('https://raw.githubusercontent.com/selva86/datasets/refs/heads/master/BostonHousing.csv') #collect data
-    target_col = 'medv'
-
-    return tabular_data_helper(df, target_col, True)
-
-#Plotting Utils
-def plot_loss_curves(history):
-    '''
-    Docstring for plot_loss_curves
-    
-
-    :param history: dictionary containing training history with keys 'train_loss' and 'val_loss'
-    '''
-    train_loss = history['train_loss']
-    val_loss = history['val_loss']
-    epochs = range(1, len(train_loss) + 1)
-
-    plt.figure(figsize=(8, 6))
-    plt.plot(epochs, train_loss, 'b', label='Training Loss')
-    plt.plot(epochs, val_loss, 'r', label='Validation Loss')
-
-    plt.title('Training and Validation Loss')
-    plt.xlabel('Epochs')
-    plt.ylabel('Loss')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
