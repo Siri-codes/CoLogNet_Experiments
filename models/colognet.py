@@ -56,9 +56,10 @@ class Variant(Enum):
     COFRNET = ("cofr", False)
     COFRNET_O = ("cofr_o", True)
     COLOGNET = ("colog", False)
-    COLOGNET_B = ("colog_b", False)
-    COLOGNET_E = ("colog_e", False)
-    COLOGNET_O = ("colog_o", True)
+    COLOGNET_B = ("colog_b", False) #binarized
+    COLOGNET_E = ("colog_e", False) #euclidean distance
+    COLOGNET_O = ("colog_o", True) #original formula
+    COLOGNET_S = ("colog_s", False) #sequential
     MLP = ("mlp", False)
     SWIGLU = ("swiglu", False)
  
@@ -97,6 +98,11 @@ class ContNet_Model(nn.Module):
         2) apply recurrence formula using coefficients --> single value
 
         To combine ladder results, perform matrix multiply with final_layer to get vector of output_size
+
+    Variant 6: CoLogNet-S
+    - Continued logarithms, continuant form
+    - Floating point
+    - Sequential instead of parallel ladders --- use residual connections to fill extra terms
     '''
     
     def __init__(self, model_type, input_size, output_size, depth_list, dropout):
@@ -116,12 +122,19 @@ class ContNet_Model(nn.Module):
         self.output_size = output_size
         self.depth_list = depth_list
         self.layers = nn.ModuleList()
+        self.model_type = model_type
 
         self.final_layer = nn.Linear(in_features=len(depth_list), out_features=output_size, bias=True)
-
+        
         for d_i in depth_list:
           l_i = Ladder(model_type, input_size, d_i, dropout)
           self.layers.append(l_i)
+
+        if model_type is Variant.COLOGNET_S:
+            self.res_con_weights = nn.ModuleList()
+            for d_i in depth_list[1:]: #skip first ladder since no residual connection needed
+                res_con_weight = nn.Linear(input_size, d_i - 1) #extra terms to fill in inputs to next ladder
+                self.res_con_weights.append(res_con_weight)     
 
     def forward(self, inputs):
         '''
@@ -129,8 +142,19 @@ class ContNet_Model(nn.Module):
 
         :param inputs: 2D input vector [input_size, batch_size]
         '''
-        # Get outputs from each ladder
-        output = torch.stack([ladder(inputs) for ladder in self.layers], dim=1) # [batch, num_ladders]
+        if self.model_type is Variant.COLOGNET_S: #sequential ladders + residual connections
+            curr_inputs = inputs
+            for i in len(self.layers):
+                ladder = self.layers[i]
+                res_con_weight = self.res_con_weights[i]
+                extra_terms = res_con_weight(curr_inputs) #get extra terms to fill in inputs to next ladder)
+                
+                output = ladder(curr_inputs)
+                curr_inputs = torch.cat((output, extra_terms, dim=1) #add residual connection terms to inputs for next ladder
+        
+        else: #parallel ladders
+            # Get outputs from each ladder
+            output = torch.stack([ladder(inputs) for ladder in self.layers], dim=1) # [batch, num_ladders]
 
         # Apply final linear layer
         output = self.final_layer(output)
@@ -267,7 +291,7 @@ class Ladder(nn.Module):
 
         #recursive step
         for i in range(1, n):
-            if model_type is COFRNET_O:
+            if model_type is Variant.COFRNET_O:
                 C_term = 1.0
             else:
                 C_term = C[i]
@@ -276,12 +300,3 @@ class Ladder(nn.Module):
             A_prev = A_n #prepping new A_{n-1} term
         
         return A_n
-
-
-        
-
-
-        
-
-
-
