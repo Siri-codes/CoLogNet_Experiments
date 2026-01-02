@@ -155,20 +155,20 @@ def process_data_custom_dataloader(full_train, test_dataset, batch_size, val_spl
 
     return train_loader, val_loader, test_loader, None
 
-def process_data_waveform(data_dir='/tmp/data'):
+def process_data_waveform(batch_size, data_dir='/tmp/data'):
     df = pd.read_csv('http://www.dropbox.com/s/qtdv1teptf097zl/waveformnoise.csv?dl=1')
     target_col = df.columns[-1]
 
-    return tabular_data_helper(df, target_col, False)
+    return tabular_data_helper(df, target_col, False, batch_size)
 
 
-def process_data_boston(data_dir='/tmp/data'):
+def process_data_boston(batch_size, data_dir='/tmp/data'):
     df = pd.read_csv('https://raw.githubusercontent.com/selva86/datasets/refs/heads/master/BostonHousing.csv') #collect data
     target_col = 'medv'
 
-    return tabular_data_helper(df, target_col, True)
+    return tabular_data_helper(df, target_col, True, batch_size)
 
-def tabular_data_helper(df, target_col, is_regression):
+def tabular_data_helper(df, target_col, is_regression, batch_size):
     '''
     Docstring for tabular_data_helper
     split data into train, val, and test sets

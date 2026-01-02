@@ -161,7 +161,7 @@ class Ladder(nn.Module):
       coeffs_t = coeffs.t()
 
       # Recurrence --> [batch]
-      output = self.recurrence_formula_orig if self.model_type.is_orig else self.recurrence_formula_cont(coeffs_t, self.model_type)
+      output = self.recurrence_formula_orig(coeffs_t, self.model_type) if self.model_type.is_orig else self.recurrence_formula_cont(coeffs_t, self.model_type)
 
       # Apply dropout
       output = self.dropout(output.view(-1, 1)) # ensuring output is one column of length batch_size
@@ -233,7 +233,8 @@ class Ladder(nn.Module):
 
         return A_n / (B_n + epsilon) #add small epsilon if cofrnet
 
-    def recurrence_formula_orig(X: torch.Tensor):
+    @staticmethod
+    def recurrence_formula_orig(X: torch.Tensor, model_type):
         # X: tensor of exponents for recurrence terms,
         '''
         Computes value of continued logarithm using original formula:
