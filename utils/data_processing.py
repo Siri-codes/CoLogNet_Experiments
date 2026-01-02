@@ -10,6 +10,7 @@ from sklearn.preprocessing import StandardScaler
 from torchvision import datasets
 from torchvision.transforms import v2
 from torch.utils.data import Subset
+from torch.utils.data import DataLoader
 
 #Data Processing
 
@@ -207,9 +208,9 @@ def tabular_data_helper(df, target_col, is_regression):
     val_dataset = to_tensor_ds(X_val, y_val, False)
     test_dataset = to_tensor_ds(X_test, y_test, False)
 
-    train_loader = Dataloader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = Dataloader(val_dataset, batch_size=batch_size, shuffle=True)
-    test_loader = Dataloader(test_dataset, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
     return train_loader, val_loader, test_loader, y_scaler
 
