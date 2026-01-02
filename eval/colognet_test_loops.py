@@ -12,6 +12,7 @@ from sklearn.metrics import r2_score
 
 import wandb
 from math import floor
+from torch.utils.data import DataLoader
 
 from CoLogNet_Experiments.utils.data_processing import Dataset_Enum, process_data
 from CoLogNet_Experiments.utils.plotting import plot_loss_curves

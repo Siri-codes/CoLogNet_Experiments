@@ -28,6 +28,10 @@ def binarize_with_ste(x):
     return Binarize_STE.apply(x)
 
 class Euclidean_Distance_Layer(nn.Module):
+    '''
+    Custom layer to replace Linear Layer
+    Calculates Euclidean / L2 distance between inputs and weights: d(x, w) = sqrt((x - w)^2)
+    '''
     def __init__(self, in_features, out_features):
         super().__init__()
 
@@ -48,12 +52,18 @@ class Euclidean_Distance_Layer(nn.Module):
 
 #Continued Fraction/Logarithm Model Variants
 class Variant(Enum):
-    COFRNET = "cofr"
-    COLOGNET = "colog"
-    COLOGNET_B = "colog_b" 
-    COLOGNET_E = "colog_e"
-    MLP = "mlp"
-    SWIGLU = "swiglu"
+
+    COFRNET = ("cofr", False)
+    COFRNET_O = ("cofr_o", True)
+    COLOGNET = ("colog", False)
+    COLOGNET_B = ("colog_b", False)
+    COLOGNET_E = ("colog_e", False)
+    COLOGNET_O = ("colog_o", True)
+    MLP = ("mlp", False)
+    SWIGLU = ("swiglu", False)
+ 
+    def __init__(self, value, is_orig):
+        self.is_orig = is_orig #using original formula instead of continuant form (possibly more numerically stable)
 
 #Continued Fraction/Logarithm Neural Network Model
 class ContNet_Model(nn.Module):
@@ -74,6 +84,10 @@ class ContNet_Model(nn.Module):
     - Continued logarithms, continuant form
     - Floating point
     - Euclidean distance instead of dot product with weights to get coefficients
+
+    Variant 5: CoLogNet-O
+    - Continued logarithms, original form
+    - Floating point
 
     All variants follow Ladder Structure:
         Given a list of depths [d_1, d_2, d_3, ..., d_n], creates n ladders
@@ -147,7 +161,7 @@ class Ladder(nn.Module):
       coeffs_t = coeffs.t()
 
       # Recurrence --> [batch]
-      output = self.recurrence_formula(coeffs_t, self.model_type)
+      output = self.recurrence_formula_orig if self.model_type.is_orig else self.recurrence_formula_cont(coeffs_t, self.model_type)
 
       # Apply dropout
       output = self.dropout(output.view(-1, 1)) # ensuring output is one column of length batch_size
@@ -156,7 +170,7 @@ class Ladder(nn.Module):
       return output.view(-1)
     
     @staticmethod
-    def recurrence_formula(X: torch.Tensor, model_type): 
+    def recurrence_formula_cont(X: torch.Tensor, model_type): 
         # X: tensor of exponents for recurrence terms, 
         # model_type: Variant.COFRNET, Variant.COLOGNET, Variant.COLOGNETB
         '''
@@ -218,3 +232,55 @@ class Ladder(nn.Module):
             B_prev2, B_prev = B_prev, B_n #ditto
 
         return A_n / (B_n + epsilon) #add small epsilon if cofrnet
+
+    def recurrence_formula_orig(X: torch.Tensor):
+        # X: tensor of exponents for recurrence terms,
+        '''
+        Computes value of continued logarithm using original formula:
+        C_0 + C_0/(C_1 + C_1/(C_2 + ...)), where C_i = 2^(X[i])
+       
+        Working backwards, calculates C_{n-1} + C_{n-1}/C_{n}, then C_{n-2} + C_{n-2}/(C_{n-1} + C_{n-1}/C_{n}), ...
+        But since order doesn't matter, we actually calculate C_1 + C_1/C_0, then C_2 + C_2/(C_1 + C_1/C_0), ...
+
+        In other words, the formula is:
+        A_n = C_n + C_n/A_{n-1}
+
+        Also a COFRNET version, where the formula is instead:
+        A_n = C_n + 1/A_{n-1}
+        '''
+
+        n = X.shape[0]
+
+        if model_type is Variant.COFRNET_O:
+            C = X
+            epsilon = 0.1
+        else:
+            C = torch.pow(2, X) #raise 2^x for each value
+            epsilon = 0.0
+
+        #base cases:
+        if n == 1:
+            return C[0]
+
+        A_prev = C[0]
+
+        #recursive step
+        for i in range(1, n):
+            if model_type is COFRNET_O:
+                C_term = 1.0
+            else:
+                C_term = C[i]
+
+            A_n = C[i] + C_term / (A_prev + epsilon) #next term
+            A_prev = A_n #prepping new A_{n-1} term
+        
+        return A_n
+
+
+        
+
+
+        
+
+
+
