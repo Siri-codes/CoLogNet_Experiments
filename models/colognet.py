@@ -51,63 +51,22 @@ class Euclidean_Distance_Layer(nn.Module):
         # output shape: (batch, out_features)
         return torch.cdist(x.unsqueeze(1), self.weight.unsqueeze(0), p=2).squeeze(1)
 
-#Continued Fraction/Logarithm Model Variants
-class Variant(Enum):
-
-    COFRNET = ("cofr", False)
-    COFRNET_O = ("cofr_o", True)
-    COLOGNET = ("colog", False)
-    COLOGNET_B = ("colog_b", False) #binarized
-    COLOGNET_E = ("colog_e", False) #euclidean distance
-    COLOGNET_O = ("colog_o", True) #original formula
-    COLOGNET_S = ("colog_s", False) #sequential
-    COLOGNET_R = ("colog_r", False) #reciprocal applied after each ladder
-    MLP = ("mlp", False)
-    SWIGLU = ("swiglu", False)
- 
-    def __init__(self, value, is_orig):
-        self.is_orig = is_orig #using original formula instead of continuant form (possibly more numerically stable)
-
 #Continued Fraction/Logarithm Neural Network Model
 class ContNet_Model(nn.Module):
     '''
-    Variant 1: CoFrNet
-    - Continued fractions, continuant form
-    - Floating point
-
-    Variant 2: CoLogNet
-    - Continued logarithms, continuant form
-    - Floating point
-
-    Variant 3: CoLogNet-B
-    - Continued logarithms, continuant form
-    - Outputs binarized before recurrence formula
-
-    Variant 4: CoLogNet-E
-    - Continued logarithms, continuant form
-    - Floating point
-    - Euclidean distance instead of dot product with weights to get coefficients
-
-    Variant 5: CoLogNet-O
-    - Continued logarithms, original form
-    - Floating point
 
     All variants follow Ladder Structure:
         Given a list of depths [d_1, d_2, d_3, ..., d_n], creates n ladders
 
-        For each ladder,
-        1) matrix multiply inputs by weights w_i to get coefficients
+        For each ladder (if parallel ladders),
+        1) matrix multiply inputs by weights w_i to get coefficients (or use euclidean distance)
         2) apply recurrence formula using coefficients --> single value
 
         To combine ladder results, perform matrix multiply with final_layer to get vector of output_size
 
-    Variant 6: CoLogNet-S
-    - Continued logarithms, continuant form
-    - Floating point
-    - Sequential instead of parallel ladders --- use residual connections to fill extra terms
     '''
     
-    def __init__(self, model_type, input_size, output_size, depth_list, dropout):
+    def __init__(self, variant_settings: dict, input_size: int, output_size: int, depth_list: list, dropout: float):
         '''
         Docstring for __init__
         
@@ -120,12 +79,20 @@ class ContNet_Model(nn.Module):
         '''
         super().__init__()
         
+        #unpack variant settings
+        self.is_cofr = variant_settings['is_cofr'] #using continued fractions (True) or continued logarithms (False)?
+        self.is_bin = variant_settings['is_bin'] #binarizing coefficients before recurrence?
+        self.is_orig = variant_settings['is_orig'] #using original formula instead of continuant form?
+        self.is_seq = variant_settings['is_seq'] #using sequential ladders instead of parallel ones?
+        self.is_euc_dist = variant_settings['is_euc_dist'] #using euclidean distance instead of dot product with weights to get coefficients?
+        self.is_reciprocal = variant_settings['is_reciprocal'] #applying reciprocal after each ladder?
+        self.is_dist_norm = variant_settings['is_dist_norm'] #normalizing coefficients to be unit vector?
+
         self.input_size = input_size
         self.output_size = output_size
         self.depth_list = depth_list
         self.layers = nn.ModuleList()
-        self.model_type = model_type
-
+       
         for d_i in depth_list:
             l_i = Ladder(model_type, d_i, dropout)
             self.layers.append(l_i)
@@ -133,12 +100,12 @@ class ContNet_Model(nn.Module):
         self.final_layer = nn.Linear(in_features=len(depth_list), out_features=output_size, bias=True)
         
         #weights to get coefficients for recurrence formula
-        if model_type is Variant.COLOGNET_S:
+        if self.is_seq:
             self.coeff_weight = nn.Linear(input_size, depth_list[0]) #first ladder gets coefficients from inputs
         else:
-            self.coeff_weight = Euclidean_Distance_Layer(input_size, sum(depth_list)) if model_type is Variant.COLOGNET_E else nn.Linear(input_size, sum(depth_list))
+            self.coeff_weight = Euclidean_Distance_Layer(input_size, sum(depth_list)) if self.is_euc_dist else nn.Linear(input_size, sum(depth_list))
 
-        if model_type is Variant.COLOGNET_S:
+        if self.is_seq:
             # Calculate the total number of filler terms needed across all ladders
             # skip first ladder, each ladder needs filler_size d_i - 1
             self.filler_sizes = [d_i - 1 for d_i in depth_list[1:]]
@@ -161,7 +128,7 @@ class ContNet_Model(nn.Module):
         #apply weights: (if sequential, will get coefficients for first ladder only, else will get coefficients for all ladders)
         coeffs = self.coeff_weight(inputs) # [batch, first_depth] or [batch, sum(depth_list)]
 
-        if self.model_type is Variant.COLOGNET_S:
+        if self.is_seq:
             curr_inputs = coeffs
             ladder_outputs = []
             
@@ -193,7 +160,7 @@ class ContNet_Model(nn.Module):
             
             output = torch.stack(ladder_outputs, dim=1)
     
-        if self.model_type is Variant.COLOGNET_R:
+        if self.is_reciprocal:
             # Apply reciprocal to each ladder output
             output = 1.0 / output
 
@@ -217,14 +184,19 @@ class Ladder(nn.Module):
       coeffs = self.norm(inputs)
 
       # Binarize if CoLogB
-      if self.model_type is Variant.COLOGNET_B:
+      if self.is_bin:
         coeffs = binarize_with_ste(coeffs)
+
+      if self.is_dist_norm:
+        # normalize coefficients to be unit vector
+        l2_norm = torch.linalg.norm(coeffs)
+        coeffs = coeffs / l2_norm #normalize coefficients
 
       # Transpose for recurrence: [depth, batch]
       coeffs_t = coeffs.t()
 
       # Recurrence --> [batch]
-      output = self.recurrence_formula_orig(coeffs_t, self.model_type) if self.model_type.is_orig else self.recurrence_formula_cont(coeffs_t, self.model_type)
+      output = self.recurrence_formula_orig(coeffs_t, self.is_cofr) if self.is_orig else self.recurrence_formula_cont(coeffs_t, self.is_cofr)
 
       # Apply dropout
       output = self.dropout(output.view(-1, 1)) # ensuring output is one column of length batch_size
@@ -233,7 +205,7 @@ class Ladder(nn.Module):
       return output.view(-1)
     
     @staticmethod
-    def recurrence_formula_cont(X: torch.Tensor, model_type): 
+    def recurrence_formula_cont(X: torch.Tensor, is_cofr): 
         # X: tensor of exponents for recurrence terms, 
         # model_type: Variant.COFRNET, Variant.COLOGNET, Variant.COLOGNETB
         '''
@@ -259,7 +231,7 @@ class Ladder(nn.Module):
     
         n = X.shape[0]
 
-        if model_type is Variant.COFRNET:
+        if is_cofr:
             C = X
             epsilon = 0.1
         else:
@@ -284,7 +256,7 @@ class Ladder(nn.Module):
         #recursive step (A_n and B_n formulas dependent on model_type)
         
         for i in range(1, n):
-            if model_type is Variant.COFRNET:
+            if is_cofr:
                 dep_term = 1.0
             else:
                 dep_term = C[i-1]
@@ -297,7 +269,7 @@ class Ladder(nn.Module):
         return A_n / (B_n + epsilon) #add small epsilon if cofrnet
 
     @staticmethod
-    def recurrence_formula_orig(X: torch.Tensor, model_type):
+    def recurrence_formula_orig(X: torch.Tensor, is_cofr):
         # X: tensor of exponents for recurrence terms,
         '''
         Computes value of continued logarithm using original formula:
@@ -315,7 +287,7 @@ class Ladder(nn.Module):
 
         n = X.shape[0]
 
-        if model_type is Variant.COFRNET_O:
+        if is_cofr:
             C = X
             epsilon = 0.1
         else:
@@ -330,7 +302,7 @@ class Ladder(nn.Module):
 
         #recursive step
         for i in range(1, n):
-            if model_type is Variant.COFRNET_O:
+            if is_cofr:
                 C_term = 1.0
             else:
                 C_term = C[i]

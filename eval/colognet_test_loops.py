@@ -20,19 +20,32 @@ from CoLogNet_Experiments.models.colognet import ContNet_Model, Variant
 from CoLogNet_Experiments.models.mlp import MLP
 from CoLogNet_Experiments.models.mlp import SwiGLUMLP
 
-def train_test_loop(dataset_enum, model_type, depths, learning_rate, dropout, batch_size, num_epochs, weight_decay=1e-4, num_hidden=1, logger=None):
+class Model_Type(Enum):
+    '''
+    Docstring for Model_Type
+    Enum for model types: MLP, SWIGLU, and all ContNet variants
+    '''
+    
+    MLP = "mlp"
+    SWIGLU = "swiglu"
+    ContNet = "contnet"
+
+def train_test_loop(dataset_enum : Dataset_Enum, model_type : Model_Type, variant_settings : dict, depths : list, learning_rate : float, dropout : float, batch_size : int, num_epochs : int, weight_decay=1e-4, num_hidden=1, logger=None):
   '''
   Docstring for train_test_loop
   Customizeable train/test loop: Trains and evaluates a model on the specified dataset with given hyperparameters.
-  
-  :param dataset: the dataset to use (not necesarily one of the standard enums)
-  :param model_type: the type of model to use (e.g., Variant.MLP)
-  :param depths: list specifying the depth of each layer in the model
-  :param learning_rate: learning rate for the optimizer
-  :param dropout: dropout rate 
-  :param batch_size: batch size for training
-  :param num_epochs: number of epochs to train
-  :param weight_decay: weight decay (L2 regularization) for the optimizer
+
+  param: dataset_enum: the dataset to train on (includes train, test, val sets + y_scaler)
+  param: model_type: the type of model to train
+  param: variant_settings: settings for the model variant
+  param: depths: list of ladder depths
+  param: learning_rate: learning rate for training
+  param: dropout: dropout rate for training
+  param: batch_size: batch size for training
+  param: num_epochs: number of epochs to train for
+  param: weight_decay: weight decay for training
+  param: num_hidden: number of hidden layers for MLP
+  param: logger: logger for logging metrics
   '''
 
   #get dataset (train, test, val, specifies which dataset it is)
@@ -42,7 +55,7 @@ def train_test_loop(dataset_enum, model_type, depths, learning_rate, dropout, ba
   output_size = dataset_enum.output_size
   is_regression = dataset_enum.is_regression
 
-  model = get_model(model_type, input_size, output_size, depths, dropout, num_hidden)
+  model = get_model(model_type, variant_settings, input_size, output_size, depths, dropout, num_hidden)
   #model = torch.compile(model, mode="reduce-overhead") #helps with speed
 
   #train the model
@@ -172,7 +185,7 @@ def train_test_wandb_lim_params():
 
         wandb.log({"score": result_metric, "total_params": total_params})
 
-def get_model(model_type, input_size, output_size, depths, dropout, num_hidden):
+def get_model(model_type, variant_settings, input_size, output_size, depths, dropout, num_hidden):
     '''
     Get a model based on the specified model type and parameters.
     :param model_type: the type of model to create
@@ -181,15 +194,15 @@ def get_model(model_type, input_size, output_size, depths, dropout, num_hidden):
     :param depths: list of ladder depths
     '''
     
-    if model_type is Variant.MLP:
+    if model_type is Model_Type.MLP:
         # Calculate target parameters based on ContNet architecture
         target_params = calculate_parameters(input_size, output_size, depths)
         model = MLP(input_size, output_size, target_params, dropout, num_hidden)
-    elif model_type is Variant.SWIGLU:
+    elif model_type is Model_Type.SWIGLU:
         target_params = calculate_parameters(input_size, output_size, depths)
         model = SwiGLUMLP(input_size, output_size, depths, dropout)
     else:
-        model = ContNet_Model(model_type, input_size, output_size, depths, dropout)
+        model = ContNet_Model(variant_settings, input_size, output_size, depths, dropout)
     return model
 
 def eval_model(model, test_loader, is_regression, y_scaler): 
