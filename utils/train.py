@@ -131,6 +131,6 @@ def train(model, train_loader, val_loader, is_regression, num_epochs, lr, weight
             if logger is not None:
                 logger.log("val_acc", avg_val_acc)
 
-        print(f"Epoch {epoch}: Val Loss: {avg_val_loss:.4f}")
+        print(f"Epoch {epoch}: Train Loss: {train_loss}; Val Loss: {avg_val_loss:.4f}")
 
     return history
