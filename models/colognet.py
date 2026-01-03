@@ -8,6 +8,7 @@ from torch.nn.parameter import Parameter # import Parameter to create custom act
 import torch.nn.functional as F # import torch functions
 
 from enum import Enum
+import math
 
 #Straight-Through Estimator (for binarized CoLogNetB)
 class Binarize_STE(torch.autograd.Function): 
@@ -60,6 +61,7 @@ class Variant(Enum):
     COLOGNET_E = ("colog_e", False) #euclidean distance
     COLOGNET_O = ("colog_o", True) #original formula
     COLOGNET_S = ("colog_s", False) #sequential
+    COLOGNET_R = ("colog_r", False) #reciprocal applied after each ladder
     MLP = ("mlp", False)
     SWIGLU = ("swiglu", False)
  
@@ -125,8 +127,8 @@ class ContNet_Model(nn.Module):
         self.model_type = model_type
 
         for d_i in depth_list:
-          l_i = Ladder(model_type, input_size, d_i, dropout)
-          self.layers.append(l_i)
+            l_i = Ladder(model_type, d_i, dropout)
+            self.layers.append(l_i)
 
         self.final_layer = nn.Linear(in_features=len(depth_list), out_features=output_size, bias=True)
         
@@ -134,7 +136,7 @@ class ContNet_Model(nn.Module):
         if model_type is Variant.COLOGNET_S:
             self.coeff_weight = nn.Linear(input_size, depth_list[0]) #first ladder gets coefficients from inputs
         else:
-            self.coeff_weight = nn.Linear(input_size, sum(depth_list))
+            self.coeff_weight = Euclidean_Distance_Layer(input_size, sum(depth_list)) if model_type is Variant.COLOGNET_E else nn.Linear(input_size, sum(depth_list))
 
         if model_type is Variant.COLOGNET_S:
             # Calculate the total number of filler terms needed across all ladders
@@ -160,7 +162,7 @@ class ContNet_Model(nn.Module):
         coeffs = self.coeff_weight(inputs) # [batch, first_depth] or [batch, sum(depth_list)]
 
         if self.model_type is Variant.COLOGNET_S:
-            curr_inputs = inputs
+            curr_inputs = coeffs
             ladder_outputs = []
             
             # Pre-calculate all fillers in one fast pass
@@ -188,7 +190,13 @@ class ContNet_Model(nn.Module):
             for ladder, current_input in zip(self.layers, ladder_inputs):
                 out = ladder(current_input)
                 ladder_outputs.append(out)
+            
+            output = torch.stack(ladder_outputs, dim=1)
     
+        if self.model_type is Variant.COLOGNET_R:
+            # Apply reciprocal to each ladder output
+            output = 1.0 / output
+
         # Apply final linear layer
         output = self.final_layer(output)
 
@@ -196,19 +204,17 @@ class ContNet_Model(nn.Module):
         return output.view(-1) if self.output_size == 1 else output
     
 class Ladder(nn.Module):
-    def __init__(self, model_type, input_size, depth, dropout):
+    def __init__(self, model_type, depth, dropout):
         super().__init__()
         self.model_type = model_type
-        self.input_size = input_size
         self.depth = depth
-
-        self.weight = EuclideanDistanceLayer(input_size, depth) if model_type is Variant.COLOGNET_E else nn.Linear(input_size, depth) #linear layer to get coefficients
+        
         self.norm = nn.LayerNorm(depth) #normalization layer
         self.dropout = nn.Dropout(p=dropout) # optional dropout layer
-        
+
     def forward(self, inputs):
       # Coefficients: [batch, depth]
-      coeffs = self.norm(self.weight(inputs))
+      coeffs = self.norm(inputs)
 
       # Binarize if CoLogB
       if self.model_type is Variant.COLOGNET_B:
