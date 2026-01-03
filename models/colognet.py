@@ -124,17 +124,31 @@ class ContNet_Model(nn.Module):
         self.layers = nn.ModuleList()
         self.model_type = model_type
 
-        self.final_layer = nn.Linear(in_features=len(depth_list), out_features=output_size, bias=True)
-        
         for d_i in depth_list:
           l_i = Ladder(model_type, input_size, d_i, dropout)
           self.layers.append(l_i)
 
+        self.final_layer = nn.Linear(in_features=len(depth_list), out_features=output_size, bias=True)
+        
+        #weights to get coefficients for recurrence formula
         if model_type is Variant.COLOGNET_S:
-            self.res_con_weights = nn.ModuleList()
-            for d_i in depth_list[1:]: #skip first ladder since no residual connection needed
-                res_con_weight = nn.Linear(input_size, d_i - 1) #extra terms to fill in inputs to next ladder
-                self.res_con_weights.append(res_con_weight)     
+            self.coeff_weight = nn.Linear(input_size, depth_list[0]) #first ladder gets coefficients from inputs
+        else:
+            self.coeff_weight = nn.Linear(input_size, sum(depth_list))
+
+        if model_type is Variant.COLOGNET_S:
+            # Calculate the total number of filler terms needed across all ladders
+            # skip first ladder, each ladder needs filler_size d_i - 1
+            self.filler_sizes = [d_i - 1 for d_i in depth_list[1:]]
+            self.total_filler_dim = sum(self.filler_sizes)
+            
+            # To save on parameters:
+            rank = 16  # Hyperparameter: much smaller than input_size (784)
+            self.res_con_down = nn.Linear(input_size, rank, bias=False)
+            self.res_con_up = nn.Linear(rank, self.total_filler_dim, bias=True)
+
+            # One big layer instead of many small ones
+            self.res_con_net = nn.Linear(input_size, self.total_filler_dim)
 
     def forward(self, inputs):
         '''
@@ -142,20 +156,39 @@ class ContNet_Model(nn.Module):
 
         :param inputs: 2D input vector [input_size, batch_size]
         '''
-        if self.model_type is Variant.COLOGNET_S: #sequential ladders + residual connections
-            curr_inputs = inputs
-            for i in len(self.layers):
-                ladder = self.layers[i]
-                res_con_weight = self.res_con_weights[i]
-                extra_terms = res_con_weight(curr_inputs) #get extra terms to fill in inputs to next ladder)
-                
-                output = ladder(curr_inputs)
-                curr_inputs = torch.cat((output, extra_terms, dim=1) #add residual connection terms to inputs for next ladder
-        
-        else: #parallel ladders
-            # Get outputs from each ladder
-            output = torch.stack([ladder(inputs) for ladder in self.layers], dim=1) # [batch, num_ladders]
+        #apply weights: (if sequential, will get coefficients for first ladder only, else will get coefficients for all ladders)
+        coeffs = self.coeff_weight(inputs) # [batch, first_depth] or [batch, sum(depth_list)]
 
+        if self.model_type is Variant.COLOGNET_S:
+            curr_inputs = inputs
+            ladder_outputs = []
+            
+            # Pre-calculate all fillers in one fast pass
+            all_fillers = self.res_con_up(self.res_con_down(inputs))
+            filler_list = torch.split(all_fillers, self.filler_sizes, dim=1)
+            
+            for i, ladder in enumerate(self.layers):
+                # Now curr_inputs will match the ladder's expected dimension
+                out = ladder(curr_inputs)
+                ladder_outputs.append(out)
+                
+                if i < len(filler_list):
+                    # Concatenate to form the input for the NEXT ladder
+                    curr_inputs = torch.cat((out.view(-1, 1), filler_list[i]), dim=1)
+            
+            output = torch.stack(ladder_outputs, dim=1)
+            
+        else: #parallel ladders
+            
+            # split coeffs based on depth_list
+            ladder_inputs = torch.split(coeffs, self.depth_list, dim=1)
+
+            # map ladders to their respective input slices
+            ladder_outputs = []
+            for ladder, current_input in zip(self.layers, ladder_inputs):
+                out = ladder(current_input)
+                ladder_outputs.append(out)
+    
         # Apply final linear layer
         output = self.final_layer(output)
 

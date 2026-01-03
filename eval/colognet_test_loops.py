@@ -43,6 +43,7 @@ def train_test_loop(dataset_enum, model_type, depths, learning_rate, dropout, ba
   is_regression = dataset_enum.is_regression
 
   model = get_model(model_type, input_size, output_size, depths, dropout, num_hidden)
+  #model = torch.compile(model, mode="reduce-overhead") #helps with speed
 
   #train the model
   history = train(model, train_loader, val_loader, is_regression, num_epochs=num_epochs, lr=learning_rate, weight_decay=weight_decay, logger=logger)
