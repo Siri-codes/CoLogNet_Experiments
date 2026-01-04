@@ -23,7 +23,8 @@ variant_settings = {
     'is_seq' : False,
     'is_euc_dist' : False,
     'is_reciprocal' : False,
-    'is_dist_norm' : False
+    'is_dist_norm' : False,
+    'is_log' : False
 }
 depths = [4, 4, 4, 4]
 lr = 0.05

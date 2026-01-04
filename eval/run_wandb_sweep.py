@@ -14,6 +14,7 @@ COLOGNET = {
     'is_euc_dist' : False,
     'is_reciprocal' : False,
     'is_dist_norm' : False
+    'is_log' : False
 }
 
 COLOGNET_E = {
@@ -23,7 +24,8 @@ COLOGNET_E = {
     'is_seq' : False,
     'is_euc_dist' : True,
     'is_reciprocal' : False,
-    'is_dist_norm' : False
+    'is_dist_norm' : False,
+    'is_log' : False
 }
 
 COLOGNET_S = {
@@ -33,7 +35,19 @@ COLOGNET_S = {
     'is_seq' : True,
     'is_euc_dist' : False,
     'is_reciprocal' : False,
+    'is_dist_norm' : False,
+    'is_log' : False
+}
+
+COLOGNET_L = {
+    'is_cofr' : False,
+    'is_bin' : False,
+    'is_orig' : False,
+    'is_seq' : False,
+    'is_euc_dist' : False,
+    'is_reciprocal' : False,
     'is_dist_norm' : False
+    'is_log' : True
 }
 
 #some useful sweep configurations:

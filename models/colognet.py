@@ -70,7 +70,7 @@ class ContNet_Model(nn.Module):
         '''
         Docstring for __init__
         
-        :param model_type: Variant.COFRNET, Variant.COLOGNET, or Variant.COLOGNETB
+        :param variant_settings: dictionary of settings for model variant
         :param input_size: size of input data
         :param output_size: size of output vector
         :param depth_list: list of depths of ladders
@@ -87,6 +87,7 @@ class ContNet_Model(nn.Module):
         self.is_euc_dist = variant_settings['is_euc_dist'] #using euclidean distance instead of dot product with weights to get coefficients?
         self.is_reciprocal = variant_settings['is_reciprocal'] #applying reciprocal after each ladder?
         self.is_dist_norm = variant_settings['is_dist_norm'] #normalizing coefficients to be unit vector?
+        self.is_log = variant_settings['is_log'] #apply log before weights?
 
         self.input_size = input_size
         self.output_size = output_size
@@ -124,7 +125,17 @@ class ContNet_Model(nn.Module):
         Docstring for forward
 
         :param inputs: 2D input vector [input_size, batch_size]
+
+        1) apply weights to get coefficients (diff shape for sequential vs. parallel)
+        2) pass coefficients into ladder(s)
+        3) apply final linear layer to combine ladder results (also true for sequential since keep prev results)
         '''
+
+        if self.is_log:
+            C = abs(inputs.min().item()) + 0.0001
+            inputs = inputs + C
+            inputs = torch.log(inputs) #apply log before weights
+
         #apply weights: (if sequential, will get coefficients for first ladder only, else will get coefficients for all ladders)
         coeffs = self.coeff_weight(inputs) # [batch, first_depth] or [batch, sum(depth_list)]
 
@@ -172,6 +183,14 @@ class ContNet_Model(nn.Module):
     
 class Ladder(nn.Module):
     def __init__(self, variant_settings, depth, dropout):
+        '''
+        Docstring for __init__
+
+        :param variant_settings: dictionary of settings for model variant
+        :param depth: depth of ladder
+        :param dropout: dropout rate to prevent overfitting, typical values between 0.2 and 0.5
+        '''
+
         super().__init__()
         
         #unpack variant settings
@@ -182,36 +201,49 @@ class Ladder(nn.Module):
         self.is_euc_dist = variant_settings['is_euc_dist'] #using euclidean distance instead of dot product with weights to get coefficients?
         self.is_reciprocal = variant_settings['is_reciprocal'] #applying reciprocal after each ladder?
         self.is_dist_norm = variant_settings['is_dist_norm'] #normalizing coefficients to be unit vector?
-        
+        self.is_log = variant_settings['is_log'] #apply log before weights?
+
         self.depth = depth
         
         self.norm = nn.LayerNorm(depth) #normalization layer
         self.dropout = nn.Dropout(p=dropout) # optional dropout layer
 
     def forward(self, inputs):
-      # Coefficients: [batch, depth]
-      coeffs = self.norm(inputs)
+        '''
+        Docstring for forward
 
-      # Binarize if CoLogB
-      if self.is_bin:
-        coeffs = binarize_with_ste(coeffs)
+        :param inputs: 2D input vector [batch, depth]
+        
+        1) apply normalization
+        2) binarize if CoLogB
+        3) apply recurrence formula (original or continuant)
+        4) apply dropout
 
-      if self.is_dist_norm:
-        # normalize coefficients to be unit vector
-        l2_norm = torch.linalg.norm(coeffs)
-        coeffs = coeffs / l2_norm #normalize coefficients
+        '''
 
-      # Transpose for recurrence: [depth, batch]
-      coeffs_t = coeffs.t()
+        # Coefficients: [batch, depth]
+        coeffs = self.norm(inputs)
 
-      # Recurrence --> [batch]
-      output = self.recurrence_formula_orig(coeffs_t, self.is_cofr) if self.is_orig else self.recurrence_formula_cont(coeffs_t, self.is_cofr)
+        # Binarize if CoLogB
+        if self.is_bin:
+            coeffs = binarize_with_ste(coeffs)
 
-      # Apply dropout
-      output = self.dropout(output.view(-1, 1)) # ensuring output is one column of length batch_size
+        if self.is_dist_norm:
+            # normalize coefficients to be unit vector
+            l2_norm = torch.linalg.norm(coeffs)
+            coeffs = coeffs / l2_norm #normalize coefficients
 
-      # Return as [batch] for stacking
-      return output.view(-1)
+        # Transpose for recurrence: [depth, batch]
+        coeffs_t = coeffs.t()
+
+        # Recurrence --> [batch]
+        output = self.recurrence_formula_orig(coeffs_t, self.is_cofr) if self.is_orig else self.recurrence_formula_cont(coeffs_t, self.is_cofr)
+
+        # Apply dropout
+        output = self.dropout(output.view(-1, 1)) # ensuring output is one column of length batch_size
+
+        # Return as [batch] for stacking
+        return output.view(-1)
     
     @staticmethod
     def recurrence_formula_cont(X: torch.Tensor, is_cofr : bool): 
