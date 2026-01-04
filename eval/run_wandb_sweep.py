@@ -6,13 +6,44 @@ import wandb
 import os
 from CoLogNet_Experiments.eval.colognet_test_loops import train_test_wandb
 
+COLOGNET = {
+    'is_cofr' : False,
+    'is_bin' : False,
+    'is_orig' : False,
+    'is_seq' : False,
+    'is_euc_dist' : False,
+    'is_reciprocal' : False,
+    'is_dist_norm' : False
+}
+
+COLOGNET_E = {
+    'is_cofr' : False,
+    'is_bin' : False,
+    'is_orig' : False,
+    'is_seq' : False,
+    'is_euc_dist' : True,
+    'is_reciprocal' : False,
+    'is_dist_norm' : False
+}
+
+COLOGNET_S = {
+    'is_cofr' : False,
+    'is_bin' : False,
+    'is_orig' : False,
+    'is_seq' : True,
+    'is_euc_dist' : False,
+    'is_reciprocal' : False,
+    'is_dist_norm' : False
+}
+
 #some useful sweep configurations:
 sweep_config_bayes_mlp = {
     'method': 'bayes',  # Grid search: iterates through all combinations
     'metric': {'name': 'score', 'goal': 'maximize'},  # maximizing accuracy
     'parameters': {
         'dataset': {'values': ['MNIST']},
-        'model_type': {'values': ['MLP']},
+        'model_type': {'values': ['MLP', 'CONTNET']},
+        'variant_settings': {'values': [COLOGNET, COLOGNET_E, COLOGNET_S]}
         'lr': {'distribution': 'log_uniform_values',
                'min': 0.001,
                'max': 0.05},
@@ -29,7 +60,7 @@ sweep_config_grid = {
     'metric': {'name': 'score', 'goal': 'maximize'},  # maximizing accuracy
     'parameters': {
         'dataset': {'values': ['MNIST']},
-        'model_type': {'values': ['MLP', 'COFRNET', 'COLOGNET']},
+        'model_type': {'values': ['MLP', 'CONTNET']},
         'lr': {'values': [0.001, 0.005, 0.01, 0.05]},
         'num_ladders' : {'values': [3, 4, 7, 8, 11, 12, 15, 16]}, #for mlp num_ladders doesn't matter
         'base_depth': {'values': [3, 4, 7, 8]},  # restrict # of total parameters model can use

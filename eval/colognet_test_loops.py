@@ -12,11 +12,12 @@ from sklearn.metrics import r2_score
 
 import wandb
 from math import floor
+from enum import Enum
 
 from CoLogNet_Experiments.utils.data_processing import Dataset_Enum, process_data
 from CoLogNet_Experiments.utils.plotting import plot_loss_curves
 from CoLogNet_Experiments.utils.train import train
-from CoLogNet_Experiments.models.colognet import ContNet_Model, Variant
+from CoLogNet_Experiments.models.colognet import ContNet_Model
 from CoLogNet_Experiments.models.mlp import MLP
 from CoLogNet_Experiments.models.mlp import SwiGLUMLP
 
@@ -28,7 +29,7 @@ class Model_Type(Enum):
     
     MLP = "mlp"
     SWIGLU = "swiglu"
-    ContNet = "contnet"
+    CONTNET = "contnet"
 
 def train_test_loop(dataset_enum : Dataset_Enum, model_type : Model_Type, variant_settings : dict, depths : list, learning_rate : float, dropout : float, batch_size : int, num_epochs : int, weight_decay=1e-4, num_hidden=1, logger=None):
   '''
@@ -86,7 +87,7 @@ def train_test_wandb():
     with wandb.init() as run:
         config = run.config # Retrieve hyperparameters from W&B config
         
-        model_type = Variant[config.model_type]
+        model_type = Model_Type[config.model_type]
 
         dataset = Dataset_Enum[config.dataset]
 
@@ -107,7 +108,7 @@ def train_test_wandb():
         
         logger = Wandb_Logger()
 
-        result_metric, total_params, model = train_test_loop(dataset, model_type, depths, config.lr, config.dropout, config.batch_size, num_epochs=50, weight_decay=1e-4, num_hidden=config.num_hidden, logger=logger)
+        result_metric, total_params, model = train_test_loop(dataset, model_type, config.variant_settings, depths, config.lr, config.dropout, config.batch_size, num_epochs=50, weight_decay=1e-4, num_hidden=config.num_hidden, logger=logger)
         
         wandb.log({"score": result_metric, "total_params": total_params})
 

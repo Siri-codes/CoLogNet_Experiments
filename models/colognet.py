@@ -94,7 +94,7 @@ class ContNet_Model(nn.Module):
         self.layers = nn.ModuleList()
        
         for d_i in depth_list:
-            l_i = Ladder(model_type, d_i, dropout)
+            l_i = Ladder(variant_settings, d_i, dropout)
             self.layers.append(l_i)
 
         self.final_layer = nn.Linear(in_features=len(depth_list), out_features=output_size, bias=True)
@@ -171,9 +171,18 @@ class ContNet_Model(nn.Module):
         return output.view(-1) if self.output_size == 1 else output
     
 class Ladder(nn.Module):
-    def __init__(self, model_type, depth, dropout):
+    def __init__(self, variant_settings, depth, dropout):
         super().__init__()
-        self.model_type = model_type
+        
+        #unpack variant settings
+        self.is_cofr = variant_settings['is_cofr'] #using continued fractions (True) or continued logarithms (False)?
+        self.is_bin = variant_settings['is_bin'] #binarizing coefficients before recurrence?
+        self.is_orig = variant_settings['is_orig'] #using original formula instead of continuant form?
+        self.is_seq = variant_settings['is_seq'] #using sequential ladders instead of parallel ones?
+        self.is_euc_dist = variant_settings['is_euc_dist'] #using euclidean distance instead of dot product with weights to get coefficients?
+        self.is_reciprocal = variant_settings['is_reciprocal'] #applying reciprocal after each ladder?
+        self.is_dist_norm = variant_settings['is_dist_norm'] #normalizing coefficients to be unit vector?
+        
         self.depth = depth
         
         self.norm = nn.LayerNorm(depth) #normalization layer
@@ -205,9 +214,9 @@ class Ladder(nn.Module):
       return output.view(-1)
     
     @staticmethod
-    def recurrence_formula_cont(X: torch.Tensor, is_cofr): 
+    def recurrence_formula_cont(X: torch.Tensor, is_cofr : bool): 
         # X: tensor of exponents for recurrence terms, 
-        # model_type: Variant.COFRNET, Variant.COLOGNET, Variant.COLOGNETB
+        # is_cofr - is this a continued fraction or continued logarithm?
         '''
         Computes convergent x_n = A_n/B_n, where
         
@@ -269,7 +278,7 @@ class Ladder(nn.Module):
         return A_n / (B_n + epsilon) #add small epsilon if cofrnet
 
     @staticmethod
-    def recurrence_formula_orig(X: torch.Tensor, is_cofr):
+    def recurrence_formula_orig(X: torch.Tensor, is_cofr : bool):
         # X: tensor of exponents for recurrence terms,
         '''
         Computes value of continued logarithm using original formula:

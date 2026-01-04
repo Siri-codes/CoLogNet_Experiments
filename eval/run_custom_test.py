@@ -13,15 +13,25 @@ from CoLogNet_Experiments.eval.colognet_test_loops import train_test_loop
 from CoLogNet_Experiments.models.colognet import Variant
 
 # Choose dataset, model_type, hyperparameters:
-dataset = Dataset_Enum.MNIST #options: MNIST, CIFAR10, WAVEFORM, BOSTON
-model_type = Variant.COLOGNET #options: MLP, SWIGLU, COFRNET, COLOGNET, COLOGNET_B, COLOGNET_E
-depths = [4, 4, 4, 4, 4] 
-lr = 0.0005
-dropout = 0.1 #recommended range: [0.0 - 0.5]
-batch_size = 200
-num_epochs = 30
+dataset = Dataset_Enum.BOSTON
+model_type = Model_Type.CONTNET
+
+variant_settings = {
+    'is_cofr' : False,
+    'is_bin' : False,
+    'is_orig' : False,
+    'is_seq' : False,
+    'is_euc_dist' : False,
+    'is_reciprocal' : False,
+    'is_dist_norm' : False
+}
+depths = [4, 4, 4, 4]
+lr = 0.05
+dropout = 0.0
+batch_size = 128
+num_epochs = 50
 weight_decay = 1e-4
-num_hidden = 1 #only for MLP -- number of hidden layers
+num_hidden = 1
 
 def main():
     '''
@@ -29,7 +39,7 @@ def main():
     '''
 
     # The train/test loop will print out/plot results
-    train_test_loop(dataset, model_type, depths, lr, dropout, batch_size, num_epochs, weight_decay)
+    train_test_loop(dataset, model_type, variant_settings, depths, lr, dropout, batch_size, num_epochs, weight_decay, num_hidden)
 
 if __name__ == "__main__":
     main()
