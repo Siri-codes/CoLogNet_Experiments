@@ -13,7 +13,7 @@ COLOGNET = {
     'is_seq' : False,
     'is_euc_dist' : False,
     'is_reciprocal' : False,
-    'is_dist_norm' : False
+    'is_dist_norm' : False,
     'is_log' : False
 }
 
@@ -39,6 +39,17 @@ COLOGNET_S = {
     'is_log' : False
 }
 
+COLOGNET_R = {
+    'is_cofr' : False,
+    'is_bin' : False,
+    'is_orig' : False,
+    'is_seq' : False,
+    'is_euc_dist' : False,
+    'is_reciprocal' : True,
+    'is_dist_norm' : False,
+    'is_log' : False
+}
+
 COLOGNET_L = {
     'is_cofr' : False,
     'is_bin' : False,
@@ -46,8 +57,19 @@ COLOGNET_L = {
     'is_seq' : False,
     'is_euc_dist' : False,
     'is_reciprocal' : False,
-    'is_dist_norm' : False
+    'is_dist_norm' : False,
     'is_log' : True
+}
+
+COLOGNET_D = {
+    'is_cofr' : False,
+    'is_bin' : False,
+    'is_orig' : False,
+    'is_seq' : False,
+    'is_euc_dist' : False,
+    'is_reciprocal' : False,
+    'is_dist_norm' : True,
+    'is_log' : False
 }
 
 #some useful sweep configurations:
@@ -57,7 +79,7 @@ sweep_config_bayes_mlp = {
     'parameters': {
         'dataset': {'values': ['MNIST']},
         'model_type': {'values': ['MLP', 'CONTNET']},
-        'variant_settings': {'values': [COLOGNET, COLOGNET_E, COLOGNET_S]}
+        'variant_settings': {'values': [COLOGNET, COLOGNET_E, COLOGNET_S]},
         'lr': {'distribution': 'log_uniform_values',
                'min': 0.001,
                'max': 0.05},
@@ -74,10 +96,11 @@ sweep_config_grid = {
     'metric': {'name': 'score', 'goal': 'maximize'},  # maximizing accuracy
     'parameters': {
         'dataset': {'values': ['MNIST']},
-        'model_type': {'values': ['MLP', 'CONTNET']},
-        'lr': {'values': [0.001, 0.005, 0.01, 0.05]},
+        'model_type': {'values': ['CONTNET']},
+        'variant_settings': {'values': [COLOGNET, COLOGNET_E, COLOGNET_S, COLOGNET_R, COLOGNET_L]},
+        'lr': {'values': [0.001, 0.01]},
         'num_ladders' : {'values': [3, 4, 7, 8, 11, 12, 15, 16]}, #for mlp num_ladders doesn't matter
-        'base_depth': {'values': [3, 4, 7, 8]},  # restrict # of total parameters model can use
+        'base_depth': {'values': [3, 4, 7, 8]},  
         'config_type': {'values': ['Even_Odd']},
         'batch_size': {'values': [128, 256, 512]},
         'dropout': {'values': [0.0, 0.1, 0.2]},
