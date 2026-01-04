@@ -197,7 +197,7 @@ def get_model(model_type, variant_settings, input_size, output_size, depths, dro
     
     if model_type is Model_Type.MLP:
         # Calculate target parameters based on ContNet architecture
-        target_params = calculate_parameters(input_size, output_size, depths)
+        target_params = calculate_parameters(input_size, output_size, depths, variant_settings["is_mlp"])
         model = MLP(input_size, output_size, target_params, dropout, num_hidden)
     elif model_type is Model_Type.SWIGLU:
         target_params = calculate_parameters(input_size, output_size, depths)
@@ -260,7 +260,7 @@ def eval_model(model, test_loader, is_regression, y_scaler):
 
 
 @staticmethod
-def calculate_parameters(input_size, output_size, depths):
+def calculate_parameters(input_size, output_size, depths, is_mlp):
   '''
   Calculates the total number of parameters for a ContNet model given input size, output size, and ladder depths.
 
@@ -279,5 +279,10 @@ def calculate_parameters(input_size, output_size, depths):
 
   # 3. Total Model Parameters
   target_params = ladder_params_total + combiner_params
+
+  if is_mlp:
+      hidden_size = 128 
+      extra_params = (input_size + sum(depths) + 1) * hidden_size + sum(depths) # inputs x hidden + hidden x outputs + hidden + output where output = sum(depths)
+      target_params = target_params + extra_params
 
   return target_params
