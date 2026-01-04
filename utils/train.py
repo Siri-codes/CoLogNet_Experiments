@@ -49,7 +49,7 @@ def train(model, train_loader, val_loader, is_regression, num_epochs, lr, weight
 
             # Regression targets need to be reshaped to (batch, 1)
             if is_regression:
-                    loss = loss_fn(outputs.view(-1), targets.view(-1))
+                    loss = loss_fn(outputs.view(-1), targets.view(-1).float())
                     train_running_mae += torch.abs(outputs - targets).sum().item()
             else:
                     loss = loss_fn(outputs, targets)
