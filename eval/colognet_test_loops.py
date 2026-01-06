@@ -282,7 +282,8 @@ def calculate_parameters(input_size, output_size, depths, is_mlp):
 
   if is_mlp:
       hidden_size = 128 
-      extra_params = (input_size + sum(depths) + 1) * hidden_size + sum(depths) # inputs x hidden + hidden x outputs + hidden + output where output = sum(depths)
+      extra_params_per_ladder = (input_size + sum(depths) + 1) * hidden_size + sum(depths) # inputs x hidden + hidden x outputs + hidden + output where output = sum(depths)
+      extra_params = extra_params_per_ladder * len(depths)
       target_params = target_params + extra_params
 
   return target_params

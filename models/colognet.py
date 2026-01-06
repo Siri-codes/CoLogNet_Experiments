@@ -88,7 +88,7 @@ class ContNet_Model(nn.Module):
         self.is_reciprocal = variant_settings['is_reciprocal'] #applying reciprocal after each ladder?
         self.is_dist_norm = variant_settings['is_dist_norm'] #normalizing coefficients to be unit vector?
         self.is_log = variant_settings['is_log'] #apply log before weights?
-        self.is_mlp = variant_setting['is_mlp'] #using MLP instead of linear layer
+        self.is_mlp = variant_settings['is_mlp'] #using MLP instead of linear layer
 
         self.input_size = input_size
         self.output_size = output_size
@@ -105,9 +105,10 @@ class ContNet_Model(nn.Module):
         if self.is_seq:
             self.coeff_weight = nn.Linear(input_size, depth_list[0]) #first ladder gets coefficients from inputs
         elif self.is_mlp:
-            hidden_size = input_size 
+            hidden_size = input_size
             self.coeff_weight = nn.Sequential(
                 nn.Linear(input_size, hidden_size),
+                nn.BatchNorm1d(hidden_size),
                 nn.ReLU(),
                 nn.Linear(hidden_size, sum(depth_list))
             )
